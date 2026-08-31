@@ -117,7 +117,8 @@ function saveAll() {
 // ---------------- Navigation ----------------
 const titles = {
   dashboard: "Dashboard", employees: "Employees", attendance: "Attendance / Timekeeping",
-  cashadvance: "Cash Advance Tracking", payroll: "Payroll Processing", reports: "Reports"
+  cashadvance: "Cash Advance Tracking", payroll: "Payroll Processing", reports: "Reports",
+  usermgmt: "User Management"
 };
 
 function go(section) {
@@ -513,3 +514,266 @@ renderCashAdvances();
 renderPayroll();
 renderReport();
 populateEmployeeOptions();
+
+/* ================================================================
+   AUTHENTICATION & USER MANAGEMENT  (Forms 1, 2, 3)
+   ================================================================ */
+
+let users = store.get("jems2_users", null);
+let currentUser = null;
+
+function defaultUsers() {
+  return [
+    { id: "USR-001", username: "admin",       email: "admin@joecon.com",       department: "Admin / HR",
+      password: "admin123", status: "Active", rights: ["read", "write", "execute", "admin"], expiry: "" }
+  ];
+}
+function saveUsers() { store.set("jems2_users", users); }
+
+const ACCESS_LABELS = { read: "Read", write: "Write", execute: "Execute", admin: "Admin" };
+
+function can(perm) {
+  if (!currentUser) return false;
+  return currentUser.rights.indexOf(perm) !== -1;
+}
+function isExpired(u) {
+  return u.expiry && u.expiry < todayISO();
+}
+
+// ---------------- Login screen / app gate ----------------
+function showLogin() {
+  $("#loginScreen").classList.add("open");
+  $("#loginError").classList.remove("show");
+}
+function showApp() {
+  $("#loginScreen").classList.remove("open");
+  populateUserMenu();
+  applyPermissions();
+  // non-admins must never land on the admin page
+  if (!can("admin")) {
+    const active = document.querySelector(".nav-link.active");
+    if (active && active.dataset.section === "usermgmt") go("dashboard");
+  }
+}
+
+function setLoginError(msg) {
+  const el = $("#loginError");
+  el.textContent = msg;
+  el.classList.toggle("show", !!msg);
+}
+
+$("#loginForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  const id = $("#loginUser").value.trim().toLowerCase();
+  const pass = $("#loginPass").value;
+  const u = users.find(function (x) {
+    return x.username.toLowerCase() === id || x.email.toLowerCase() === id;
+  });
+  if (!u || u.password !== pass) return setLoginError("Invalid username/email or password.");
+  if (u.status !== "Active")   return setLoginError("This account is Inactive. Contact the administrator.");
+  if (isExpired(u))            return setLoginError("This account has expired on " + fmtDate(u.expiry) + ".");
+
+  currentUser = u;
+  store.set("jems2_session", { id: u.id });
+  try {
+    if ($("#rememberMe").checked) localStorage.setItem("jems2_remember", u.id);
+    else localStorage.removeItem("jems2_remember");
+  } catch (err) {}
+  $("#loginPass").value = "";
+  setLoginError("");
+  showApp();
+});
+
+// Show/Hide password toggles
+document.querySelectorAll(".pw-toggle").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    const targetId = btn.dataset.toggle;
+    const input = targetId ? document.getElementById(targetId)
+                           : btn.closest(".pw-wrap").querySelector("input");
+    if (!input) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    btn.textContent = show ? "Hide" : "Show";
+  });
+});
+
+// ---------------- Top-bar user menu & logout ----------------
+function populateUserMenu() {
+  if (!currentUser) return;
+  $("#umName").textContent = currentUser.username;
+  $("#umSub").textContent = currentUser.department + " · " + currentUser.email;
+  $("#umBadges").innerHTML = currentUser.rights.map(function (r) {
+    return '<span class="perm-badge ' + r + '">' + ACCESS_LABELS[r] + '</span>';
+  }).join("");
+  $("#topAvatar").textContent = initials(currentUser.username.replace(/[._-]/g, " ")) || "U";
+}
+
+$("#userMenuBtn").addEventListener("click", function (e) {
+  e.stopPropagation();
+  $("#userMenu").classList.toggle("open");
+});
+$("#btnLogout").addEventListener("click", function () {
+  currentUser = null;
+  store.set("jems2_session", null);
+  $("#userMenu").classList.remove("open");
+  showLogin();
+});
+document.addEventListener("click", function (e) {
+  if (!e.target.closest(".usermenu-wrap")) $("#userMenu").classList.remove("open");
+});
+
+// ---------------- Permission gating ----------------
+function applyPermissions() {
+  // admin-only nav items
+  document.querySelectorAll("[data-admin-only]").forEach(function (el) {
+    el.style.display = can("admin") ? "" : "none";
+  });
+
+  // buttons that require a specific right
+  document.querySelectorAll("[data-need]").forEach(function (btn) {
+    const ok = can(btn.dataset.need);
+    btn.disabled = !ok;
+    if (!ok) btn.title = "Requires '" + ACCESS_LABELS[btn.dataset.need] + "' access right";
+    else btn.removeAttribute("title");
+  });
+
+  const missing = [];
+  if (!can("write"))   missing.push("add records (Write)");
+  if (!can("execute")) missing.push("time-in/out & payroll (Execute)");
+  if (!can("admin"))   missing.push("user management (Admin)");
+  const banner = $("#permBanner");
+  if (missing.length) {
+    banner.hidden = false;
+    banner.textContent = "Signed in as " + currentUser.username + ". Read-only access — you cannot " + missing.join(" or ") + ".";
+  } else {
+    banner.hidden = true;
+  }
+}
+
+// ---------------- Form 1: Add User ----------------
+function setFormMsg(id, msg, ok) {
+  const el = $(id);
+  el.textContent = msg;
+  el.className = "form-msg " + (ok ? "ok" : "err");
+}
+
+$("#userForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  const username = $("#uUsername").value.trim();
+  const email = $("#uEmail").value.trim();
+  const department = $("#uDepartment").value;
+  const password = $("#uPassword").value;
+  const status = $("#uStatus").value;
+  if (!username || !email || !password) return;
+
+  const dup = users.some(function (u) {
+    return u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === email.toLowerCase();
+  });
+  if (dup) return setFormMsg("#userFormMsg", "Username or email already exists.", false);
+
+  const num = users.length ? Math.max.apply(null, users.map(function (u) { return parseInt(u.id.split("-")[1]); })) + 1 : 1;
+  users.push({
+    id: "USR-" + String(num).padStart(3, "0"),
+    username: username, email: email, department: department,
+    password: password, status: status,
+    rights: ["read"], expiry: ""
+  });
+  saveUsers();
+  renderUserTable();
+  populateUserSelect();
+  setFormMsg("#userFormMsg", "User " + username + " added (default: Read only). Assign access rights in Form 2.", true);
+  e.target.reset();
+  $("#uDepartment").value = "Admin / HR";
+});
+
+// ---------------- Form 2: Role & Access Assignment ----------------
+function populateUserSelect() {
+  $("#rUserId").innerHTML = users.map(function (u) {
+    return '<option value="' + u.id + '">' + u.id + ' — ' + u.username + '</option>';
+  }).join("");
+  loadRoleForm();
+}
+
+function loadRoleForm() {
+  const id = $("#rUserId").value;
+  const u = users.find(function (x) { return x.id === id; });
+  document.querySelectorAll(".acc-chk").forEach(function (c) { c.checked = !!(u && u.rights.indexOf(c.value) !== -1); });
+  $("#rExpiry").value = u ? (u.expiry || "") : "";
+}
+
+$("#rUserId").addEventListener("change", loadRoleForm);
+
+$("#roleForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  const id = $("#rUserId").value;
+  const u = users.find(function (x) { return x.id === id; });
+  if (!u) return;
+  u.rights = Array.from(document.querySelectorAll(".acc-chk:checked")).map(function (c) { return c.value; });
+  if (u.rights.indexOf("read") === -1) u.rights.unshift("read");
+  u.expiry = $("#rExpiry").value;
+  saveUsers();
+  renderUserTable();
+  populateUserMenu && currentUser && currentUser.id === u.id && populateUserMenu();
+  applyPermissions();
+  setFormMsg("#roleFormMsg", "Access rights updated for " + u.username + ": " + u.rights.map(function (r) { return ACCESS_LABELS[r]; }).join(", ") + ".", true);
+});
+
+// ---------------- Users table ----------------
+function renderUserTable() {
+  $("#userTable").innerHTML = users.length
+    ? users.map(function (u) {
+        const badges = (u.rights.length ? u.rights : ["read"]).map(function (r) {
+          return '<span class="perm-badge ' + r + '">' + ACCESS_LABELS[r] + "</span>";
+        }).join("");
+        const exp = isExpired(u)
+          ? '<span class="status-pill inactive">Expired ' + fmtDate(u.expiry) + "</span>"
+          : (u.expiry ? fmtDate(u.expiry) : "No expiry");
+        const delBtn = (currentUser && currentUser.id === u.id)
+          ? '<span class="note" style="margin:0;">Current user</span>'
+          : '<button class="btn btn-outline btn-sm" data-del-user="' + u.id + '">Remove</button>';
+        return "<tr>" +
+          "<td><strong>" + u.id + "</strong></td>" +
+          "<td>" + u.username + "</td>" +
+          "<td>" + u.email + "</td>" +
+          "<td>" + u.department + "</td>" +
+          "<td>" + badges + "</td>" +
+          "<td>" + exp + "</td>" +
+          "<td><span class='status-pill " + (u.status === "Active" ? "active" : "inactive") + "'>" + u.status + "</span></td>" +
+          '<td class="text-right">' + delBtn + "</td>" +
+        "</tr>";
+      }).join("")
+    : '<tr><td colspan="8" class="empty">No users yet.</td></tr>';
+}
+
+document.addEventListener("click", function (e) {
+  const id = e.target.dataset.delUser;
+  if (!id) return;
+  if (id === "USR-001") return alert("The default admin account cannot be removed.");
+  if (!confirm("Remove this user account?")) return;
+  users = users.filter(function (x) { return x.id !== id; });
+  saveUsers();
+  renderUserTable();
+  populateUserSelect();
+});
+
+// ---------------- Auth init ----------------
+(function initAuth() {
+  if (!users || !users.length) {
+    users = defaultUsers();
+    saveUsers();
+  }
+  renderUserTable();
+  populateUserSelect();
+
+  // restore session (Remember me keeps the same session id)
+  const session = store.get("jems2_session", null);
+  if (session && session.id) {
+    const u = users.find(function (x) { return x.id === session.id; });
+    if (u && u.status === "Active" && !isExpired(u)) {
+      currentUser = u;
+      showApp();
+      return;
+    }
+  }
+  showLogin();
+})();

@@ -8,6 +8,45 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- ============ LOGIN SCREEN (Form 3 — System Login) ============ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-logo">
+        <img src="../images/20240211_142203_0000.png" alt="Joecon's"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
+        <span class="brand-fallback">J</span>
+      </div>
+      <div>
+        <h1>Joecon's EMS</h1>
+        <small>Steel Works</small>
+      </div>
+    </div>
+    <h2>Welcome Back</h2>
+    <p class="login-sub">Sign in to access the Employee Management System</p>
+
+    <form id="loginForm">
+      <label class="field">Username or Email
+        <input type="text" id="loginUser" placeholder="e.g. admin" required autocomplete="username">
+      </label>
+      <label class="field">Password
+        <div class="pw-wrap">
+          <input type="password" id="loginPass" placeholder="Enter your password" required autocomplete="current-password">
+          <button type="button" class="pw-toggle" id="pwToggle">Show</button>
+        </div>
+      </label>
+      <label class="remember">
+        <input type="checkbox" id="rememberMe"> Remember me
+      </label>
+      <div class="login-error" id="loginError"></div>
+      <button type="submit" class="btn btn-login">Sign In</button>
+    </form>
+
+    <div class="login-hint">Demo account &mdash; username: <b>admin</b> &middot; password: <b>admin123</b></div>
+  </div>
+</div>
+
 <div class="app">
 
   <!-- ============ SIDEBAR ============ -->
@@ -42,6 +81,11 @@
         <img class="nav-ic" src="../images/hand-coins.png" alt=""> Payroll</a>
       <a class="nav-link" data-section="reports">
         <img class="nav-ic" src="../images/message-circle-warning.png" alt=""> Reports</a>
+      <p class="nav-group" data-admin-only>Administration</p>
+      <a class="nav-link" data-section="usermgmt" data-admin-only>
+        <svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+        User Management
+      </a>
     </nav>
 
     <div class="sidebar-help">
@@ -79,9 +123,21 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
           <span class="dot"></span>
         </button>
-        <div class="top-avatar" title="Administrator">A</div>
+        <div class="usermenu-wrap">
+          <button class="top-avatar" id="userMenuBtn" title="Account menu"><span id="topAvatar">A</span></button>
+          <div class="user-menu" id="userMenu">
+            <div class="user-menu-head">
+              <strong id="umName">—</strong>
+              <span id="umSub">—</span>
+            </div>
+            <div class="user-menu-badges" id="umBadges"></div>
+            <button class="user-menu-item danger" id="btnLogout">Sign Out</button>
+          </div>
+        </div>
       </div>
     </header>
+
+    <div class="perm-banner" id="permBanner" hidden></div>
 
     <main class="content">
 
@@ -174,7 +230,7 @@
                 <input type="date" id="empHired">
               </label>
               <div class="field-spacer">
-                <button type="submit" class="btn">Add Employee</button>
+                <button type="submit" class="btn" data-need="write">Add Employee</button>
               </div>
             </div>
           </form>
@@ -213,8 +269,8 @@
             <label class="field" style="min-width:260px;">Select Employee
               <select id="attEmp"></select>
             </label>
-            <button class="btn btn-green" id="btnTimeIn">Time In</button>
-            <button class="btn btn-red" id="btnTimeOut">Time Out</button>
+            <button class="btn btn-green" id="btnTimeIn" data-need="execute">Time In</button>
+            <button class="btn btn-red" id="btnTimeOut" data-need="execute">Time Out</button>
             <span class="status-msg" id="attStatus"></span>
           </div>
           <p class="note">Standard work schedule starts at <strong>8:00 AM</strong>. Employees who time in after 8:00 AM are automatically marked late, and late minutes are deducted from payroll.</p>
@@ -253,7 +309,7 @@
                 <input type="text" id="caNotes" placeholder="e.g. Medical assistance">
               </label>
               <div class="field-spacer">
-                <button type="submit" class="btn">Record Cash Advance</button>
+                <button type="submit" class="btn" data-need="write">Record Cash Advance</button>
               </div>
             </div>
           </form>
@@ -285,7 +341,7 @@
             <label class="field">Period To
               <input type="date" id="payTo">
             </label>
-            <button class="btn" id="btnGeneratePayroll">Generate Payroll</button>
+            <button class="btn" id="btnGeneratePayroll" data-need="execute">Generate Payroll</button>
             <button class="btn btn-outline" id="btnPrintPayroll">Print Report</button>
           </div>
           <table>
@@ -327,7 +383,7 @@
             <label class="field">Period To
               <input type="date" id="repTo">
             </label>
-            <button class="btn" id="btnGenerateReport">Generate Summary</button>
+            <button class="btn" id="btnGenerateReport" data-need="execute">Generate Summary</button>
             <button class="btn btn-outline" id="btnPrintReport">Print Report</button>
           </div>
           <table>
@@ -346,10 +402,101 @@
         </div>
       </section>
 
+      <!-- ===== USER MANAGEMENT (Admin only) ===== -->
+      <section class="section" id="section-usermgmt">
+        <div class="page-head">
+          <h2>User Management</h2>
+          <p class="page-sub">Add system users and assign roles &amp; access rights</p>
+        </div>
+
+        <div class="grid-2">
+          <!-- Form 1: Add User -->
+          <div class="card">
+            <h3>Form 1 &mdash; Add User</h3>
+            <form id="userForm">
+              <div class="form-grid single">
+                <label class="field">Username
+                  <input type="text" id="uUsername" placeholder="e.g. j.delacruz" required>
+                </label>
+                <label class="field">Email Address
+                  <input type="email" id="uEmail" placeholder="e.g. jdelacruz@joecon.com" required>
+                </label>
+                <label class="field">Department
+                  <select id="uDepartment">
+                    <option>Admin / HR</option>
+                    <option>Fabrication</option>
+                    <option>Welding</option>
+                    <option>Construction</option>
+                  </select>
+                </label>
+                <label class="field">Initial Password
+                  <div class="pw-wrap">
+                    <input type="password" id="uPassword" placeholder="Set initial password" required>
+                    <button type="button" class="pw-toggle" data-toggle="uPassword">Show</button>
+                  </div>
+                </label>
+                <label class="field">Status
+                  <select id="uStatus">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </label>
+                <div class="field-spacer">
+                  <button type="submit" class="btn">Add User</button>
+                </div>
+              </div>
+            </form>
+            <p class="form-msg" id="userFormMsg"></p>
+          </div>
+
+          <!-- Form 2: Role & Access Assignment -->
+          <div class="card">
+            <h3>Form 2 &mdash; Role &amp; Access Assignment</h3>
+            <form id="roleForm">
+              <div class="form-grid single">
+                <label class="field">User ID
+                  <select id="rUserId" required></select>
+                </label>
+                <div class="field">
+                  Access Rights
+                  <div class="checkbox-row">
+                    <label class="chk"><input type="checkbox" class="acc-chk" value="read" checked> Read</label>
+                    <label class="chk"><input type="checkbox" class="acc-chk" value="write"> Write</label>
+                    <label class="chk"><input type="checkbox" class="acc-chk" value="execute"> Execute</label>
+                    <label class="chk"><input type="checkbox" class="acc-chk" value="admin"> Admin</label>
+                  </div>
+                </div>
+                <label class="field">Expiration Date
+                  <input type="date" id="rExpiry">
+                </label>
+                <div class="field-spacer">
+                  <button type="submit" class="btn">Assign Access Rights</button>
+                </div>
+              </div>
+            </form>
+            <p class="form-msg" id="roleFormMsg"></p>
+            <p class="note"><strong>Access Rights:</strong> Read = view records &nbsp;|&nbsp; Write = add/edit data &nbsp;|&nbsp; Execute = time-in/out &amp; payroll &nbsp;|&nbsp; Admin = full access &amp; user management.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>User Accounts</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>User ID</th><th>Username</th><th>Email</th><th>Department</th>
+                <th>Access Rights</th><th>Expires</th><th>Status</th><th class="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="userTable"></tbody>
+          </table>
+        </div>
+      </section>
+
     </main>
   </div>
 </div>
 
 <script src="script.js"></script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33b29975b96de27',t:'MTc4ODE3MDE1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33b6286de9f3213',t:'MTc4ODE3MjQ4OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
