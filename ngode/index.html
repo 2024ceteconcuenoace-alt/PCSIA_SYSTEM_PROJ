@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Joecon's Employee Management System</title>
+  <!-- File names must match exactly: style.css and script.js are in this same folder -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <img src="../images/20240211_142203_0000.png" alt="Joecon's"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
+        <span class="brand-fallback">J</span>
+      </div>
+      <div class="brand-text">
+        <h1>Joecon's EMS</h1>
+        <small>Steel Works</small>
+      </div>
+    </div>
+
+    <nav>
+      <p class="nav-group">Main</p>
+      <a class="nav-link active" data-section="dashboard">
+        <img class="nav-ic" src="../images/layout-dashboard.png" alt=""> Dashboard</a>
+
+      <p class="nav-group">Timekeeping</p>
+      <a class="nav-link" data-section="attendance">
+        <img class="nav-ic" src="../images/calendar-clock.png" alt=""> Attendance</a>
+      <a class="nav-link" data-section="cashadvance">
+        <img class="nav-ic" src="../images/philippine-peso.png" alt=""> Cash Advance</a>
+
+      <p class="nav-group">Organization</p>
+      <a class="nav-link" data-section="employees">
+        <img class="nav-ic" src="../images/id-card-lanyard.png" alt=""> Employees</a>
+      <a class="nav-link" data-section="payroll">
+        <img class="nav-ic" src="../images/hand-coins.png" alt=""> Payroll</a>
+      <a class="nav-link" data-section="reports">
+        <img class="nav-ic" src="../images/message-circle-warning.png" alt=""> Reports</a>
+    </nav>
+
+    <div class="sidebar-help">
+      <strong>Need Help?</strong>
+      <p>Contact the system administrator</p>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main-wrap">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="org-select">
+        <div class="org-logo">
+          <img src="../images/20240211_142203_0000.png" alt=""
+               onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
+          <span class="org-fallback">J</span>
+        </div>
+        <div>
+          <p class="org-label">Your Organization</p>
+          <p class="org-name">Joecon's Steel Works</p>
+        </div>
+        <span class="chev">⌄</span>
+      </div>
+
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="globalSearch" placeholder="Search employees (name, position, ID)...">
+      </div>
+
+      <div class="top-actions">
+        <button class="fab" id="fabAdd" title="Quick add employee">+</button>
+        <button class="icon-btn" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="dot"></span>
+        </button>
+        <div class="top-avatar" title="Administrator">A</div>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- ===== DASHBOARD ===== -->
+      <section class="section active" id="section-dashboard">
+        <div class="page-head">
+          <h2>Dashboard</h2>
+          <p class="page-sub">Overview of today's operations</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <div><h3 id="statEmployees">0</h3><p>Total Employees</p></div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <div><h3 id="statPresent">0</h3><p>Present Today</p></div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/></svg></span>
+            <div><h3 id="statLate">0</h3><p>Late Today</p></div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+            <div><h3 id="statCA">₱0.00</h3><p>Cash Advances This Month</p></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Today's Attendance</h3>
+            <table>
+              <thead><tr><th>Employee</th><th>Time In</th><th>Time Out</th><th>Status</th></tr></thead>
+              <tbody id="dashAttendance"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>Recent Cash Advances</h3>
+            <table>
+              <thead><tr><th>Date</th><th>Employee</th><th class="text-right">Amount</th></tr></thead>
+              <tbody id="dashCA"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Quick Actions</h3>
+          <div class="quick-actions">
+            <button class="btn" data-goto="attendance">Record Time In / Out</button>
+            <button class="btn" data-goto="employees">Add New Employee</button>
+            <button class="btn" data-goto="cashadvance">New Cash Advance</button>
+            <button class="btn btn-outline" data-goto="payroll">Generate Payroll</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== EMPLOYEES ===== -->
+      <section class="section" id="section-employees">
+        <div class="page-head">
+          <div class="page-head-row">
+            <h2 id="empCountTitle">Employees</h2>
+            <button class="btn btn-sm btn-outline" data-focus-add>＋ New Hire</button>
+          </div>
+          <p class="page-sub">Employee records and information</p>
+        </div>
+
+        <div class="card">
+          <h3>Add New Employee</h3>
+          <form id="employeeForm">
+            <div class="form-grid">
+              <label class="field">Full Name
+                <input type="text" id="empName" placeholder="e.g. Juan Dela Cruz" required>
+              </label>
+              <label class="field">Position / Job Title
+                <input type="text" id="empPosition" placeholder="e.g. Welder" required>
+              </label>
+              <label class="field">Department
+                <select id="empDepartment">
+                  <option>Fabrication</option>
+                  <option>Welding</option>
+                  <option>Construction</option>
+                  <option>Admin / HR</option>
+                </select>
+              </label>
+              <label class="field">Daily Rate (₱)
+                <input type="number" id="empRate" placeholder="e.g. 650" min="1" step="0.01" required>
+              </label>
+              <label class="field">Date Hired
+                <input type="date" id="empHired">
+              </label>
+              <div class="field-spacer">
+                <button type="submit" class="btn">Add Employee</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-head-row">
+            <h3 style="border:none;margin:0;padding:0;">Employee Directory</h3>
+            <div class="filter-bar">
+              <label class="filter-select">
+                <span>⫸ Filter:</span>
+                <select id="deptFilter">
+                  <option value="">All Departments</option>
+                  <option>Fabrication</option>
+                  <option>Welding</option>
+                  <option>Construction</option>
+                  <option>Admin / HR</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="emp-grid" id="employeeGrid"></div>
+        </div>
+      </section>
+
+      <!-- ===== ATTENDANCE ===== -->
+      <section class="section" id="section-attendance">
+        <div class="page-head">
+          <h2>Attendance / Timekeeping</h2>
+          <p class="page-sub" id="attDateLabel"></p>
+        </div>
+
+        <div class="card">
+          <h3>Daily Time Record (Time In / Time Out)</h3>
+          <div class="att-actions">
+            <label class="field" style="min-width:260px;">Select Employee
+              <select id="attEmp"></select>
+            </label>
+            <button class="btn btn-green" id="btnTimeIn">Time In</button>
+            <button class="btn btn-red" id="btnTimeOut">Time Out</button>
+            <span class="status-msg" id="attStatus"></span>
+          </div>
+          <p class="note">Standard work schedule starts at <strong>8:00 AM</strong>. Employees who time in after 8:00 AM are automatically marked late, and late minutes are deducted from payroll.</p>
+        </div>
+
+        <div class="card">
+          <h3>Attendance Log — Today</h3>
+          <table>
+            <thead><tr><th>Employee</th><th>Time In</th><th>Time Out</th><th>Status</th><th class="text-right">Hours Worked</th></tr></thead>
+            <tbody id="attendanceTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== CASH ADVANCE ===== -->
+      <section class="section" id="section-cashadvance">
+        <div class="page-head">
+          <h2>Cash Advance Tracking</h2>
+          <p class="page-sub">Record and monitor employee cash advances</p>
+        </div>
+
+        <div class="card">
+          <h3>New Cash Advance (CA) Request</h3>
+          <form id="caForm">
+            <div class="form-grid">
+              <label class="field">Employee
+                <select id="caEmp" required></select>
+              </label>
+              <label class="field">Amount (₱)
+                <input type="number" id="caAmount" placeholder="e.g. 2000" min="1" step="0.01" required>
+              </label>
+              <label class="field">Date Released
+                <input type="date" id="caDate" required>
+              </label>
+              <label class="field">Notes / Purpose
+                <input type="text" id="caNotes" placeholder="e.g. Medical assistance">
+              </label>
+              <div class="field-spacer">
+                <button type="submit" class="btn">Record Cash Advance</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Cash Advance Records</h3>
+          <table>
+            <thead><tr><th>CA No.</th><th>Date Released</th><th>Employee</th><th class="text-right">Amount</th><th>Purpose</th><th>Status</th></tr></thead>
+            <tbody id="caTable"></tbody>
+          </table>
+          <p class="note">Cash advances within a payroll period are automatically deducted from the employee's net pay during payroll processing.</p>
+        </div>
+      </section>
+
+      <!-- ===== PAYROLL ===== -->
+      <section class="section" id="section-payroll">
+        <div class="page-head">
+          <h2>Payroll Processing</h2>
+          <p class="page-sub">Automatic salary computation based on attendance</p>
+        </div>
+
+        <div class="card">
+          <h3>Payroll Computation</h3>
+          <div class="toolbar">
+            <label class="field">Period From
+              <input type="date" id="payFrom">
+            </label>
+            <label class="field">Period To
+              <input type="date" id="payTo">
+            </label>
+            <button class="btn" id="btnGeneratePayroll">Generate Payroll</button>
+            <button class="btn btn-outline" id="btnPrintPayroll">Print Report</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th><th>Position</th>
+                <th class="text-right">Days Present</th>
+                <th class="text-right">Late (min)</th>
+                <th class="text-right">Gross Pay</th>
+                <th class="text-right">Late Deduction</th>
+                <th class="text-right">CA Deduction</th>
+                <th class="text-right">Net Pay</th>
+              </tr>
+            </thead>
+            <tbody id="payrollBody"></tbody>
+            <tfoot id="payrollFoot"></tfoot>
+          </table>
+          <p class="note">
+            <strong>Computation:</strong> Gross Pay = Days Present × Daily Rate &nbsp;|&nbsp;
+            Late Deduction = Late Minutes × (Daily Rate ÷ 480 minutes) &nbsp;|&nbsp;
+            Net Pay = Gross Pay − Late Deduction − Cash Advances. Absences are unpaid (only days with attendance records are counted).
+          </p>
+        </div>
+      </section>
+
+      <!-- ===== REPORTS ===== -->
+      <section class="section" id="section-reports">
+        <div class="page-head">
+          <h2>Reports</h2>
+          <p class="page-sub">Attendance &amp; deduction summary per period</p>
+        </div>
+
+        <div class="card">
+          <h3>Attendance &amp; Deduction Summary</h3>
+          <div class="toolbar">
+            <label class="field">Period From
+              <input type="date" id="repFrom">
+            </label>
+            <label class="field">Period To
+              <input type="date" id="repTo">
+            </label>
+            <button class="btn" id="btnGenerateReport">Generate Summary</button>
+            <button class="btn btn-outline" id="btnPrintReport">Print Report</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th class="text-right">Days Present</th>
+                <th class="text-right">Days Late</th>
+                <th class="text-right">Total Late (min)</th>
+                <th class="text-right">Hours Worked</th>
+                <th class="text-right">Cash Advances</th>
+              </tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="script.js"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33b29975b96de27',t:'MTc4ODE3MDE1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
