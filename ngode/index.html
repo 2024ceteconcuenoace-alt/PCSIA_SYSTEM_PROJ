@@ -11,7 +11,7 @@
 
 <!-- ============ LOGIN SCREEN (Form 3 — System Login) ============ -->
 <div class="login-screen" id="loginScreen">
-  <div class="login-card">
+  <div class="login-card" id="loginCard">
     <div class="login-brand">
       <div class="brand-logo">
         <img src="../images/20240211_142203_0000.png" alt="Joecon's"
@@ -26,15 +26,19 @@
     <h2>Welcome Back</h2>
     <p class="login-sub">Sign in to access the Employee Management System</p>
 
-    <form id="loginForm">
+    <form id="loginForm" novalidate>
       <label class="field">Username or Email
-        <input type="text" id="loginUser" placeholder="e.g. admin" required autocomplete="username">
+        <input type="text" id="loginUser" placeholder="e.g. admin" required minlength="3" maxlength="60" autocomplete="username">
       </label>
       <label class="field">Password
         <div class="pw-wrap">
-          <input type="password" id="loginPass" placeholder="Enter your password" required autocomplete="current-password">
+          <input type="password" id="loginPass" placeholder="Enter your password" required maxlength="64" autocomplete="current-password">
           <button type="button" class="pw-toggle" id="pwToggle">Show</button>
         </div>
+      </label>
+      <label class="field">Verification Code (MFA)
+        <input type="text" id="loginMfa" placeholder="6-digit code" required minlength="6" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code">
+        <small class="field-hint">Your one-time code: <b id="mfaCode">------</b> <a href="#" id="mfaNew" class="mfa-new">New code</a></small>
       </label>
       <label class="remember">
         <input type="checkbox" id="rememberMe"> Remember me
@@ -43,7 +47,83 @@
       <button type="submit" class="btn btn-login">Sign In</button>
     </form>
 
+    <p class="auth-switch">New employee? <a href="#" id="showRegister">Register here</a></p>
     <div class="login-hint">Demo account &mdash; username: <b>admin</b> &middot; password: <b>admin123</b></div>
+  </div>
+
+  <!-- ============ REGISTRATION ============ -->
+  <div class="login-card" id="registerCard" hidden>
+    <div class="login-brand">
+      <div class="brand-logo">
+        <img src="../images/20240211_142203_0000.png" alt="Joecon's"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
+        <span class="brand-fallback">J</span>
+      </div>
+      <div><h1>Joecon's EMS</h1><small>Steel Works</small></div>
+    </div>
+    <h2>Employee Registration</h2>
+    <p class="login-sub">Fill in your details to be added as a new employee of Joecon's Steel Works.</p>
+
+    <form id="registerForm" novalidate>
+      <label class="field">Full Name
+        <input type="text" id="regName" placeholder="e.g. Juan Dela Cruz" required minlength="3" maxlength="60" pattern="[A-Za-zÑñ .'-]+">
+      </label>
+      <div class="reg-row">
+        <label class="field">Username
+          <input type="text" id="regUsername" placeholder="e.g. j.delacruz" required minlength="4" maxlength="20" pattern="[a-z0-9._]+" autocomplete="username">
+        </label>
+        <label class="field">Department
+          <select id="regDepartment" required>
+            <option value="" selected disabled>— Select —</option>
+            <option>Admin / HR</option>
+            <option>Fabrication</option>
+            <option>Welding</option>
+            <option>Construction</option>
+          </select>
+        </label>
+      </div>
+      <div class="reg-row">
+        <label class="field">Position / Job Title
+          <select id="regPosition" required>
+            <option value="" selected disabled>— Select —</option>
+            <option>Welder</option>
+            <option>Fabricator</option>
+            <option>Laborer</option>
+            <option>Foreman</option>
+            <option>Helper</option>
+            <option>HR Staff</option>
+            <option>Timekeeper / Staff</option>
+          </select>
+        </label>
+        <label class="field">Date Hired
+          <input type="date" id="regHired" required min="1990-01-01">
+        </label>
+      </div>
+      <div class="reg-row">
+        <label class="field">Email Address
+          <input type="email" id="regEmail" placeholder="e.g. juandelacruz@gmail.com" required minlength="16" maxlength="40" pattern="(?!.*\.\.)(?![0-9.]+@)[a-z0-9][a-z0-9.]{4,28}[a-z0-9]@gmail\.com" title="Gmail only: lowercase letters, numbers and periods, ending in @gmail.com (e.g. juandelacruz@gmail.com)" spellcheck="false" autocapitalize="off" autocomplete="email">
+          <small class="field-hint">Only <b>@gmail.com</b> is accepted &middot; lowercase letters, numbers and periods</small>
+        </label>
+        <label class="field">Contact Number
+          <input type="tel" id="regPhone" placeholder="09171234567" required minlength="11" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric">
+        </label>
+      </div>
+      <label class="field">Password
+        <div class="pw-wrap">
+          <input type="password" id="regPassword" placeholder="Min. 8 chars, letters &amp; numbers" required minlength="8" maxlength="32" autocomplete="new-password">
+          <button type="button" class="pw-toggle" data-toggle="regPassword">Show</button>
+        </div>
+      </label>
+      <div class="pw-meter"><span id="pwMeterBar"></span></div>
+      <label class="field">Confirm Password
+        <input type="password" id="regConfirm" placeholder="Re-enter password" required minlength="8" maxlength="32" autocomplete="new-password">
+      </label>
+      <label class="remember">
+        <input type="checkbox" id="regTerms" required> I confirm the information above is true and correct
+      </label>
+      <button type="submit" class="btn btn-login">Register</button>
+    </form>
+    <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Sign in</a></p>
   </div>
 </div>
 
@@ -68,13 +148,17 @@
       <a class="nav-link active" data-section="dashboard">
         <img class="nav-ic" src="../images/layout-dashboard.png" alt=""> Dashboard</a>
 
-      <p class="nav-group">Timekeeping</p>
+      <a class="nav-link" data-section="myportal">
+        <svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+        My Portal</a>
+
+      <p class="nav-group" data-staff-only>Timekeeping</p>
       <a class="nav-link" data-section="attendance">
         <img class="nav-ic" src="../images/calendar-clock.png" alt=""> Attendance</a>
       <a class="nav-link" data-section="cashadvance">
         <img class="nav-ic" src="../images/philippine-peso.png" alt=""> Cash Advance</a>
 
-      <p class="nav-group">Organization</p>
+      <p class="nav-group" data-staff-only>Organization</p>
       <a class="nav-link" data-section="employees">
         <img class="nav-ic" src="../images/id-card-lanyard.png" alt=""> Employees</a>
       <a class="nav-link" data-section="payroll">
@@ -83,15 +167,15 @@
         <img class="nav-ic" src="../images/message-circle-warning.png" alt=""> Reports</a>
       <p class="nav-group" data-admin-only>Administration</p>
       <a class="nav-link" data-section="usermgmt" data-admin-only>
-        <svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+        <svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.810 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
         User Management
       </a>
     </nav>
 
-    <div class="sidebar-help">
+    <button type="button" class="sidebar-help" id="btnHelp">
       <strong>Need Help?</strong>
-      <p>Contact the system administrator</p>
-    </div>
+      <p>View the user guide &amp; contact info</p>
+    </button>
   </aside>
 
   <!-- ============ MAIN ============ -->
@@ -99,7 +183,8 @@
 
     <!-- Top bar -->
     <header class="topbar">
-      <div class="org-select">
+      <div class="org-wrap">
+      <button type="button" class="org-select" id="orgBtn" title="Company menu">
         <div class="org-logo">
           <img src="../images/20240211_142203_0000.png" alt=""
                onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
@@ -110,6 +195,17 @@
           <p class="org-name">Joecon's Steel Works</p>
         </div>
         <span class="chev">⌄</span>
+      </button>
+      <div class="dropdown org-menu" id="orgMenu">
+        <div class="dd-head">
+          <strong>Joecon's Steel Works</strong>
+          <span>Steel fabrication &amp; construction</span>
+        </div>
+        <button class="dd-item" data-go="dashboard">Dashboard overview</button>
+        <button class="dd-item" id="btnAbout">About the company</button>
+        <button class="dd-item" data-go="reports">Reports</button>
+        <button class="dd-item" id="btnExport">Export data backup (.json)</button>
+      </div>
       </div>
 
       <div class="search-box">
@@ -118,11 +214,25 @@
       </div>
 
       <div class="top-actions">
+        <div class="top-clock" id="clock" title="Current time">--:--:--</div>
         <button class="fab" id="fabAdd" title="Quick add employee">+</button>
-        <button class="icon-btn" title="Notifications">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-          <span class="dot"></span>
+        <button class="icon-btn" id="msgBtn" title="Messages">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span class="notif-count" id="msgCount" hidden>0</span>
         </button>
+        <div class="notif-wrap">
+        <button class="icon-btn" id="notifBtn" title="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="notif-count" id="notifCount" hidden>0</span>
+        </button>
+        <div class="dropdown notif-panel" id="notifPanel">
+          <div class="dd-head row">
+            <strong>Notifications</strong>
+            <button class="link-btn" id="notifReadAll">Mark all as read</button>
+          </div>
+          <div id="notifList"></div>
+        </div>
+        </div>
         <div class="usermenu-wrap">
           <button class="top-avatar" id="userMenuBtn" title="Account menu"><span id="topAvatar">A</span></button>
           <div class="user-menu" id="userMenu">
@@ -131,6 +241,7 @@
               <span id="umSub">—</span>
             </div>
             <div class="user-menu-badges" id="umBadges"></div>
+            <button class="user-menu-item" id="btnChangePw">Change Password</button>
             <button class="user-menu-item danger" id="btnLogout">Sign Out</button>
           </div>
         </div>
@@ -195,28 +306,95 @@
         </div>
       </section>
 
+      <!-- ===== MY PORTAL (all employees) ===== -->
+      <section class="section" id="section-myportal">
+        <div class="page-head">
+          <div class="page-head-row">
+            <h2>My Portal</h2>
+            <button class="btn btn-sm btn-outline" id="portalMsgBtn">Message the Admin</button>
+          </div>
+          <p class="page-sub">Your personal attendance, payroll and cash advance status</p>
+        </div>
+
+        <div class="card portal-picker" id="portalPicker" hidden>
+          <label class="field" style="max-width:340px;">Preview an employee's portal (admin)
+            <select id="portalEmp"></select>
+          </label>
+        </div>
+
+        <div id="portalEmpty" class="card empty" hidden>
+          Your account is not linked to an employee record yet. Please contact the administrator.
+        </div>
+
+        <div id="portalBody">
+          <div class="card portal-profile">
+            <div class="emp-avatar" id="pAvatar">--</div>
+            <div>
+              <h3 id="pName" style="border:none;margin:0;padding:0;">—</h3>
+              <p class="page-sub" id="pSub">—</p>
+            </div>
+            <div class="portal-period">
+              <label class="field">Period From <input type="date" id="pFrom"></label>
+              <label class="field">Period To <input type="date" id="pTo"></label>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card"><div><h3 id="pDays">0</h3><p>Days Present</p></div></div>
+            <div class="stat-card"><div><h3 id="pLate">0</h3><p>Late (minutes)</p></div></div>
+            <div class="stat-card"><div><h3 id="pCA">₱0.00</h3><p>Cash Advances</p></div></div>
+            <div class="stat-card"><div><h3 id="pNet">₱0.00</h3><p>Estimated Net Pay</p></div></div>
+          </div>
+
+          <div class="card">
+            <h3>My Payroll Summary</h3>
+            <table>
+              <tbody id="pPayroll"></tbody>
+            </table>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <h3>My Attendance</h3>
+              <table>
+                <thead><tr><th>Date</th><th>Time In</th><th>Time Out</th><th>Status</th></tr></thead>
+                <tbody id="pAttendance"></tbody>
+              </table>
+            </div>
+            <div class="card">
+              <h3>My Cash Advances</h3>
+              <table>
+                <thead><tr><th>CA No.</th><th>Date</th><th>Purpose</th><th class="text-right">Amount</th></tr></thead>
+                <tbody id="pCATable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== EMPLOYEES ===== -->
       <section class="section" id="section-employees">
         <div class="page-head">
           <div class="page-head-row">
             <h2 id="empCountTitle">Employees</h2>
-            <button class="btn btn-sm btn-outline" data-focus-add>＋ New Hire</button>
+            <button class="btn btn-sm btn-outline" data-focus-add>+ New Hire</button>
           </div>
           <p class="page-sub">Employee records and information</p>
         </div>
 
         <div class="card">
-          <h3>Add New Employee</h3>
-          <form id="employeeForm">
+          <h3 id="empFormTitle">Add New Employee</h3>
+          <form id="employeeForm" novalidate>
             <div class="form-grid">
               <label class="field">Full Name
-                <input type="text" id="empName" placeholder="e.g. Juan Dela Cruz" required>
+                <input type="text" id="empName" placeholder="e.g. Juan Dela Cruz" required minlength="3" maxlength="60" pattern="[A-Za-zÑñ .'-]+">
               </label>
               <label class="field">Position / Job Title
-                <input type="text" id="empPosition" placeholder="e.g. Welder" required>
+                <input type="text" id="empPosition" placeholder="e.g. Welder" required minlength="2" maxlength="40">
               </label>
               <label class="field">Department
-                <select id="empDepartment">
+                <select id="empDepartment" required>
+                  <option value="" selected disabled>— Select department —</option>
                   <option>Fabrication</option>
                   <option>Welding</option>
                   <option>Construction</option>
@@ -224,13 +402,20 @@
                 </select>
               </label>
               <label class="field">Daily Rate (₱)
-                <input type="number" id="empRate" placeholder="e.g. 650" min="1" step="0.01" required>
+                <input type="number" id="empRate" placeholder="e.g. 650" min="300" max="5000" step="0.01" required>
               </label>
               <label class="field">Date Hired
-                <input type="date" id="empHired">
+                <input type="date" id="empHired" required min="1990-01-01">
               </label>
-              <div class="field-spacer">
-                <button type="submit" class="btn" data-need="write">Add Employee</button>
+              <label class="field">Email Address (Gmail)
+                <input type="email" id="empEmail" placeholder="e.g. juandelacruz@gmail.com" required minlength="16" maxlength="40" pattern="(?!.*\.\.)(?![0-9.]+@)[a-z0-9][a-z0-9.]{4,28}[a-z0-9]@gmail\.com" title="Gmail only: lowercase letters, numbers and periods, ending in @gmail.com (e.g. juandelacruz@gmail.com)" spellcheck="false" autocapitalize="off">
+              </label>
+              <label class="field">Contact Number
+                <input type="tel" id="empPhone" placeholder="e.g. 09171234567" required minlength="11" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric">
+              </label>
+              <div class="field-spacer btn-row">
+                <button type="submit" class="btn" id="empSubmit" data-need="write">Add Employee</button>
+                <button type="button" class="btn btn-outline" id="empCancel" hidden>Cancel</button>
               </div>
             </div>
           </form>
@@ -241,7 +426,7 @@
             <h3 style="border:none;margin:0;padding:0;">Employee Directory</h3>
             <div class="filter-bar">
               <label class="filter-select">
-                <span>⫸ Filter:</span>
+                <span>Filter:</span>
                 <select id="deptFilter">
                   <option value="">All Departments</option>
                   <option>Fabrication</option>
@@ -294,19 +479,19 @@
 
         <div class="card">
           <h3>New Cash Advance (CA) Request</h3>
-          <form id="caForm">
+          <form id="caForm" novalidate>
             <div class="form-grid">
               <label class="field">Employee
                 <select id="caEmp" required></select>
               </label>
               <label class="field">Amount (₱)
-                <input type="number" id="caAmount" placeholder="e.g. 2000" min="1" step="0.01" required>
+                <input type="number" id="caAmount" placeholder="e.g. 2000" min="100" max="50000" step="0.01" required>
               </label>
               <label class="field">Date Released
-                <input type="date" id="caDate" required>
+                <input type="date" id="caDate" required min="2020-01-01">
               </label>
               <label class="field">Notes / Purpose
-                <input type="text" id="caNotes" placeholder="e.g. Medical assistance">
+                <input type="text" id="caNotes" placeholder="e.g. Medical assistance" maxlength="100">
               </label>
               <div class="field-spacer">
                 <button type="submit" class="btn" data-need="write">Record Cash Advance</button>
@@ -412,37 +597,46 @@
         <div class="grid-2">
           <!-- Form 1: Add User -->
           <div class="card">
-            <h3>Form 1 &mdash; Add User</h3>
-            <form id="userForm">
+            <h3 id="userFormTitle">Form 1 &mdash; Add User</h3>
+            <form id="userForm" novalidate>
               <div class="form-grid single">
+                <label class="field">Full Name
+                  <input type="text" id="uFullName" placeholder="e.g. Juan Dela Cruz" required minlength="3" maxlength="60" pattern="[A-Za-zÑñ .'-]+">
+                </label>
                 <label class="field">Username
-                  <input type="text" id="uUsername" placeholder="e.g. j.delacruz" required>
+                  <input type="text" id="uUsername" placeholder="e.g. j.delacruz" required minlength="4" maxlength="20" pattern="[a-z0-9._]+">
                 </label>
                 <label class="field">Email Address
-                  <input type="email" id="uEmail" placeholder="e.g. jdelacruz@joecon.com" required>
+                  <input type="email" id="uEmail" placeholder="e.g. juandelacruz@gmail.com" required minlength="16" maxlength="40" pattern="(?!.*\.\.)(?![0-9.]+@)[a-z0-9][a-z0-9.]{4,28}[a-z0-9]@gmail\.com" title="Gmail only: lowercase letters, numbers and periods, ending in @gmail.com (e.g. juandelacruz@gmail.com)" spellcheck="false" autocapitalize="off">
                 </label>
                 <label class="field">Department
-                  <select id="uDepartment">
+                  <select id="uDepartment" required>
+                    <option value="" selected disabled>— Select department —</option>
                     <option>Admin / HR</option>
                     <option>Fabrication</option>
                     <option>Welding</option>
                     <option>Construction</option>
                   </select>
                 </label>
-                <label class="field">Initial Password
+                <label class="field">Contact Number
+                  <input type="tel" id="uPhone" placeholder="e.g. 09171234567" required minlength="11" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric">
+                </label>
+                <label class="field"><span id="uPasswordLabel">Initial Password</span>
                   <div class="pw-wrap">
-                    <input type="password" id="uPassword" placeholder="Set initial password" required>
+                    <input type="password" id="uPassword" placeholder="Min. 8 chars, letters &amp; numbers" required minlength="8" maxlength="32" pattern="(?=.*[A-Za-z])(?=.*\d).{8,32}">
                     <button type="button" class="pw-toggle" data-toggle="uPassword">Show</button>
                   </div>
                 </label>
                 <label class="field">Status
-                  <select id="uStatus">
+                  <select id="uStatus" required>
                     <option value="Active">Active</option>
+                    <option value="Pending">Pending Approval</option>
                     <option value="Inactive">Inactive</option>
                   </select>
                 </label>
-                <div class="field-spacer">
-                  <button type="submit" class="btn">Add User</button>
+                <div class="field-spacer btn-row">
+                  <button type="submit" class="btn" id="userSubmit">Add User</button>
+                  <button type="button" class="btn btn-outline" id="userCancel" hidden>Cancel</button>
                 </div>
               </div>
             </form>
@@ -452,7 +646,7 @@
           <!-- Form 2: Role & Access Assignment -->
           <div class="card">
             <h3>Form 2 &mdash; Role &amp; Access Assignment</h3>
-            <form id="roleForm">
+            <form id="roleForm" novalidate>
               <div class="form-grid single">
                 <label class="field">User ID
                   <select id="rUserId" required></select>
@@ -480,15 +674,26 @@
         </div>
 
         <div class="card">
-          <h3>User Accounts</h3>
+          <h3>User Accounts <span class="pending-count" id="pendingCount" hidden></span></h3>
           <table>
             <thead>
               <tr>
-                <th>User ID</th><th>Username</th><th>Email</th><th>Department</th>
+                <th>User ID</th><th>Full Name</th><th>Username</th><th>Email</th><th>Department</th>
                 <th>Access Rights</th><th>Expires</th><th>Status</th><th class="text-right">Action</th>
               </tr>
             </thead>
             <tbody id="userTable"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-head-row">
+            <h3 style="border:none;margin:0;padding:0;">Activity Log</h3>
+            <button class="btn btn-outline btn-sm" id="btnClearLog">Clear Log</button>
+          </div>
+          <table>
+            <thead><tr><th>Date &amp; Time</th><th>User</th><th>Activity</th></tr></thead>
+            <tbody id="logTable"></tbody>
           </table>
         </div>
       </section>
@@ -497,6 +702,65 @@
   </div>
 </div>
 
+<!-- ============ CHANGE PASSWORD MODAL ============ -->
+<div class="modal-backdrop" id="pwModal" hidden>
+  <div class="modal">
+    <h3>Change Password</h3>
+    <p class="login-sub">Use at least 8 characters with letters and numbers.</p>
+    <form id="cpForm" novalidate>
+      <label class="field">Current Password
+        <input type="password" id="cpCurrent" required maxlength="32" autocomplete="current-password">
+      </label>
+      <label class="field">New Password
+        <input type="password" id="cpNew" required minlength="8" maxlength="32" autocomplete="new-password">
+      </label>
+      <label class="field">Confirm New Password
+        <input type="password" id="cpConfirm" required minlength="8" maxlength="32" autocomplete="new-password">
+      </label>
+      <div class="btn-row modal-actions">
+        <button type="button" class="btn btn-outline" id="cpCancel">Cancel</button>
+        <button type="submit" class="btn">Update Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ INFO MODAL (Help / About) ============ -->
+<div class="modal-backdrop" id="infoModal" hidden>
+  <div class="modal modal-wide">
+    <div class="modal-top">
+      <h3 id="infoTitle">Info</h3>
+      <button type="button" class="modal-x" id="infoClose" title="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="infoBody"></div>
+  </div>
+</div>
+
+<!-- ============ PRIVATE MESSAGES ============ -->
+<div class="modal-backdrop" id="msgModal" hidden>
+  <div class="modal modal-msg">
+    <div class="modal-top">
+      <h3 id="msgTitle">Message the Admin</h3>
+      <button type="button" class="modal-x" id="msgClose" title="Close">&times;</button>
+    </div>
+    <div class="msg-layout">
+      <div class="msg-list" id="msgList" hidden></div>
+      <div class="msg-main">
+        <div class="msg-thread" id="msgThread"></div>
+        <form id="msgForm" novalidate>
+          <label class="field">Your message
+            <textarea id="msgText" rows="3" required minlength="2" maxlength="500" placeholder="Type your private message..."></textarea>
+          </label>
+          <div class="msg-foot">
+            <span class="field-hint" id="msgCounter">0 / 500</span>
+            <button type="submit" class="btn">Send</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="script.js"></script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33b6286de9f3213',t:'MTc4ODE3MjQ4OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
