@@ -54,9 +54,18 @@ function logActivity(action) {
 const money = n => "₱" + (Number(n) || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const $ = sel => document.querySelector(sel);
 
+function manilaParts(date) {
+  return Object.fromEntries(new Intl.DateTimeFormat("en-PH", {
+    timeZone: "Asia/Manila",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date).map(function (part) { return [part.type, part.value]; }));
+}
+
 function todayISO() {
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const parts = manilaParts(new Date());
+  return parts.year + "-" + parts.month + "-" + parts.day;
 }
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -69,8 +78,17 @@ function longDate(d) {
   return days[d.getDay()] + ", " + months[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
 }
 function fmtTime(dt) {
-  const t = dt ? new Date(dt) : new Date();
-  let h = t.getHours(), m = t.getMinutes(), s = t.getSeconds();
+  let parts;
+  if (dt instanceof Date || (typeof dt === "string" && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(dt))) {
+    parts = manilaParts(dt instanceof Date ? dt : new Date(dt));
+  } else if (dt) {
+    const match = String(dt).match(/T?(\d{2}):(\d{2}):(\d{2})/);
+    if (!match) return "—";
+    parts = { hour: match[1], minute: match[2], second: match[3] };
+  } else {
+    parts = manilaParts(new Date());
+  }
+  let h = Number(parts.hour), m = Number(parts.minute), s = Number(parts.second);
   const ap = h >= 12 ? "PM" : "AM";
   h = h % 12 || 12;
   return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0") + " " + ap;
@@ -289,20 +307,26 @@ document.addEventListener("click", function (ev) {
     closeAllMenus();
     if (act === "delete") {
       if (!can("write")) return alertDialog("Not allowed", "You need the 'Write' access right to remove employees.", "warn");
-      confirmDialog("Remove employee?", "Remove this employee? Attendance and CA records will be kept.", "Remove", true).then(function (yes) {
+      confirmDialog("Remove employee?", "Remove this employee? Related attendance and cash-advance records may prevent permanent deletion.", "Remove", true).then(async function (yes) {
         if (!yes) return;
         const gone = getEmp(id);
-        employees = employees.filter(function (x) { return x.id !== id; });
-        const portals = users.filter(function (u) { return u.empId === id; });
-        if (portals.length) {
-          users = users.filter(function (u) { return u.empId !== id; });
-          saveUsers();
-          logActivity("Removed My Portal login of " + (gone ? gone.fullName : id));
+        try {
+          await window.EMS_API.deleteEmployee(id);
+          employees = employees.filter(function (x) { return x.id !== id; });
+          const portals = users.filter(function (u) { return u.empId === id; });
+          if (portals.length) {
+            users = users.filter(function (u) { return u.empId !== id; });
+            saveUsers();
+          }
+          logActivity("Removed employee " + id + " (" + (gone ? gone.fullName : "") + ")");
+          if (editingEmpId === id) cancelEmpEdit();
+          localStorage.setItem("jems2_employees", JSON.stringify(employees));
+          renderEmployees(); renderDashboard();
+          emsToast("Employee " + id + " deleted from MySQL.");
+        } catch (error) {
+          console.error("[EMS] Employee delete failed:", error);
+          emsToast(error.message || "Employee could not be deleted from MySQL.", "err");
         }
-        logActivity("Removed employee " + id + " (" + (gone ? gone.fullName : "") + ")");
-        if (editingEmpId === id) cancelEmpEdit();
-        saveAll();
-        renderEmployees(); renderDashboard();
       });
     } else if (act === "edit") {
       startEmpEdit(id);
@@ -318,49 +342,50 @@ document.addEventListener("click", function (ev) {
   closeAllMenus();
 });
 
-$("#employeeForm").addEventListener("submit", function (e) {
-  e.preventDefault();                          // only reached when validation passed
+$("#employeeForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
   const first = val("empFirst"), middle = val("empMiddle"), last = val("empLast");
   const fullName = (first + " " + (middle ? middle + " " : "") + last).replace(/\s+/g, " ").trim();
   const data = {
-    fullName: fullName,
-    firstName: first, middleName: middle, lastName: last,
-    gender: $("#empGender").value,
-    birthday: $("#empBday").value,
-    address: {
-      street: val("empStreet"),
-      barangay: val("empBarangay"),
-      city: $("#empCity").value,
-      region: $("#empRegion").value,
-      postal: val("empPostal"),
-      country: $("#empCountry").value
-    },
-    position: $("#empPosition").value,
-    dailyRate: parseFloat($("#empRate").value),
-    dateHired: $("#empHired").value || todayISO(),
-    email: val("empEmail"),
-    phone: "0" + val("empPhone")                 // +63 9xx xxx xxxx is stored as 09xxxxxxxxx
+    fullName: fullName, firstName: first, middleName: middle, lastName: last,
+    gender: $("#empGender").value, birthday: $("#empBday").value,
+    address: { street: val("empStreet"), barangay: val("empBarangay"), city: $("#empCity").value,
+      region: $("#empRegion").value, postal: val("empPostal"), country: $("#empCountry").value },
+    position: $("#empPosition").value, dailyRate: parseFloat($("#empRate").value),
+    dateHired: $("#empHired").value || todayISO(), email: val("empEmail"),
+    phone: "0" + val("empPhone")
   };
-  if (editingEmpId) {
-    const emp = getEmp(editingEmpId);
-    Object.assign(emp, data);
-    logActivity("Updated employee " + emp.id + " (" + emp.fullName + ")");
-  } else {
-    const num = employees.length ? Math.max.apply(null, employees.map(x => parseInt(x.id.split("-")[1]))) + 1 : 1;
-    data.id = "EMP-" + String(num).padStart(3, "0");
-    employees.push(data);
-    logActivity("Added employee " + data.id + " (" + data.fullName + ", " + data.position + ")");
-  }
-  saveAll();
-  renderEmployees(); renderDashboard();
+
   const wasEdit = !!editingEmpId;
-  const targetId = editingEmpId || data.id;
-  const doneMsg = wasEdit ? ("Employee " + targetId + " updated.") : ("Employee " + data.id + " added.");
-  // Portal login (create / update / remove) is part of the same save
-  applyPortalLogin(data, targetId).then(function (note) {
-    closeEmpModal();
-    emsToast(doneMsg + (note ? " " + note : ""));
-  });
+  const targetId = editingEmpId;
+
+  try {
+    if (wasEdit) {
+      const result = await window.EMS_API.updateEmployee(targetId, data);
+      if (!result.success) throw new Error(result.message || "Employee update failed.");
+      const emp = getEmp(targetId);
+      Object.assign(emp, data);
+      logActivity("Updated employee " + targetId + " (" + emp.fullName + ")");
+    } else {
+      const result = await window.EMS_API.addEmployee(data);
+      if (!result.success || !result.id) throw new Error(result.message || "Employee creation failed.");
+      data.id = result.id;
+      employees.push(data);
+      logActivity("Added employee " + data.id + " (" + data.fullName + ", " + data.position + ")");
+    }
+
+    store.set("jems2_employees", employees);
+    renderEmployees(); renderDashboard();
+    const savedId = wasEdit ? targetId : data.id;
+    const doneMsg = wasEdit ? ("Employee " + savedId + " updated.") : ("Employee " + savedId + " added.");
+    applyPortalLogin(data, savedId).then(function (note) {
+      closeEmpModal();
+      emsToast(doneMsg + (note ? " " + note : ""));
+    });
+  } catch (error) {
+    console.error("[EMS] Employee save failed:", error);
+    emsToast(error.message || "Could not save employee to MySQL.", "err");
+  }
 });
 
 /* Give the employee a My Portal login (or update/remove the one they have).
@@ -585,34 +610,49 @@ function renderAttendance() {
   populateEmployeeOptions();
 }
 
-$("#btnTimeIn").addEventListener("click", function () {
+$("#btnTimeIn").addEventListener("click", async function () {
   const empId = $("#attEmp").value;
   if (!empId) return alertDialog("No employee selected", "Please add and select an employee first.");
   const today = todayISO();
   if (attendance.some(function (a) { return a.empId === empId && a.date === today; }))
     return alertDialog("Already timed in", "This employee has already timed in today.", "warn");
   const now = new Date();
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const lateMin = Math.max(0, minutes - (8 * 60)); // schedule starts 8:00 AM
-  attendance.push({ empId: empId, date: today, timeIn: now.toISOString(), timeOut: null, lateMin: lateMin });
-  saveAll();
-  renderAttendance(); renderDashboard();
-  logActivity("Time in: " + getEmp(empId).fullName + (lateMin ? " (late " + lateMin + " min)" : ""));
-  statusMsg("Time in recorded at " + fmtTime(now) + (lateMin ? " — marked late (" + lateMin + " min)" : " — on time") + ".");
+  const nowParts = manilaParts(now);
+  const minutes = Number(nowParts.hour) * 60 + Number(nowParts.minute);
+  const lateMin = Math.max(0, minutes - (8 * 60));
+  try {
+    const result = await window.EMS_API.addAttendance({ empId, date: today, timeIn: now.toISOString(), timeOut: null, lateMin, hoursWorked: 0 });
+    attendance.push({ id: result.attendance_id, empId, date: today, timeIn: now.toISOString(), timeOut: null, lateMin, hoursWorked: 0, status: lateMin > 0 ? "Late" : "Present" });
+    localStorage.setItem("jems2_attendance", JSON.stringify(attendance));
+    renderAttendance(); renderDashboard();
+    logActivity("Time in: " + getEmp(empId).fullName + (lateMin ? " (late " + lateMin + " min)" : ""));
+    statusMsg("Time in recorded at " + fmtTime(now) + (lateMin ? " — marked late (" + lateMin + " min)" : " — on time") + ".");
+  } catch (error) {
+    console.error(error);
+    statusMsg("Could not save time in to MySQL.");
+  }
 });
 
-$("#btnTimeOut").addEventListener("click", function () {
+$("#btnTimeOut").addEventListener("click", async function () {
   const empId = $("#attEmp").value;
   if (!empId) return alertDialog("No employee selected", "Please select an employee first.");
   const today = todayISO();
   const rec = attendance.find(function (a) { return a.empId === empId && a.date === today; });
   if (!rec) return alertDialog("No time-in record", "This employee has no time-in record for today.");
   if (rec.timeOut) return alertDialog("Already timed out", "This employee has already timed out today.", "warn");
-  rec.timeOut = new Date().toISOString();
-  saveAll();
-  renderAttendance(); renderDashboard();
-  logActivity("Time out: " + getEmp(empId).fullName);
-  statusMsg("Time out recorded at " + fmtTime(rec.timeOut) + ".");
+  const timeOut = new Date().toISOString();
+  try {
+    const result = await window.EMS_API.addAttendance({ empId, date: today, timeIn: rec.timeIn, timeOut, lateMin: rec.lateMin || 0, hoursWorked: 0 });
+    rec.timeOut = timeOut;
+    rec.id = result.attendance_id || rec.id;
+    localStorage.setItem("jems2_attendance", JSON.stringify(attendance));
+    renderAttendance(); renderDashboard();
+    logActivity("Time out: " + getEmp(empId).fullName);
+    statusMsg("Time out recorded at " + fmtTime(rec.timeOut) + ".");
+  } catch (error) {
+    console.error(error);
+    statusMsg("Could not save time out to MySQL.");
+  }
 });
 
 // ================= MODULE 4: CASH ADVANCE =================
@@ -630,20 +670,26 @@ function renderCashAdvances() {
   populateEmployeeOptions();
 }
 
-$("#caForm").addEventListener("submit", function (e) {
+$("#caForm").addEventListener("submit", async function (e) {
   e.preventDefault();
   const empId = $("#caEmp").value;
   const amount = parseFloat($("#caAmount").value);
   const date = $("#caDate").value;
   const notes = $("#caNotes").value.trim();
   if (!empId || !(amount > 0) || !date) return;
-  const id = cashAdvances.length ? Math.max.apply(null, cashAdvances.map(function (c) { return c.id; })) + 1 : 1;
-  cashAdvances.push({ id: id, empId: empId, amount: amount, date: date, notes: notes });
-  logActivity("Recorded cash advance CA-" + String(id).padStart(4, "0") + " of " + money(amount) + " for " + getEmp(empId).fullName);
-  saveAll();
-  renderCashAdvances(); renderDashboard();
-  e.target.reset();
-  $("#caDate").value = todayISO();
+  try {
+    const result = await window.EMS_API.addCashAdvance({ empId, amount, date, notes, status: "For Deduction" });
+    const id = result.ca_id;
+    cashAdvances.push({ id, empId, amount, date, notes, status: "For Deduction" });
+    localStorage.setItem("jems2_cashAdvances", JSON.stringify(cashAdvances));
+    logActivity("Recorded cash advance CA-" + String(id).padStart(4, "0") + " of " + money(amount) + " for " + getEmp(empId).fullName);
+    renderCashAdvances(); renderDashboard();
+    e.target.reset();
+    $("#caDate").value = todayISO();
+  } catch (error) {
+    console.error(error);
+    emsToast(error.message || "Could not save cash advance to MySQL.", "err");
+  }
 });
 
 // ================= MODULE 5: PAYROLL PROCESSING =================
