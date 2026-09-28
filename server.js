@@ -2805,6 +2805,38 @@ function normalizeDateTime(
     }
 
 
+    // Offset-bearing timestamps represent an instant; store its Manila wall time.
+    if (
+        /(?:Z|[+-]\d{2}:?\d{2})$/i.test(stringValue)
+    ) {
+
+        const instant = new Date(stringValue);
+
+        if (!Number.isNaN(instant.getTime())) {
+
+            const parts = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Manila",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hourCycle: "h23"
+            }).formatToParts(instant).reduce((result, part) => {
+                if (part.type !== "literal") {
+                    result[part.type] = part.value;
+                }
+                return result;
+            }, {});
+
+            return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+
+        }
+
+    }
+
+
     // Convert:
     // 2026-09-28T08:30:00
     //
