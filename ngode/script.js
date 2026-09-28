@@ -1,9 +1,20 @@
 /* ================================================================
+   BOOT: ask the Node/MySQL backend for the data BEFORE the app
+   reads it. If the server is down the app still runs from the
+   browser mirror (see api.js).
+   ================================================================ */
+(async function bootEMS() {
+  if (window.EMS_API) {
+    try { await window.EMS_API.init(); }
+    catch (e) { console.warn("[EMS] Starting from browser storage only."); }
+  }
+/* ================================================================
    Joecon's Employee Management System  (tiimi-inspired UI)
    Modules: Dashboard | Employees | Attendance | Cash Advance
             Payroll Processing | Reports
-   Tech: Vanilla HTML / CSS / JavaScript
-   Data: localStorage (browser storage) so records persist on reload
+   Tech: Vanilla HTML / CSS / JavaScript  +  Node/Express API  +  MySQL
+   Data: MySQL is the source of truth (via api.js + server.js).
+         The browser keeps a local mirror so the UI stays instant.
    ================================================================ */
 
 // ---------------- Storage layer (safe: falls back to memory) ----------------
@@ -16,6 +27,7 @@ const store = {
   },
   set(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+    try { if (window.EMS_API) window.EMS_API.save(key, value); } catch (e) {}   // mirror this collection to MySQL
   }
 };
 
@@ -25,7 +37,7 @@ let attendance = store.get("jems2_attendance", null);
 let cashAdvances = store.get("jems2_cashAdvances", null);
 
 // Edit-mode trackers (null = adding a new record)
-var editingEmpId = null, editingUserId = null;
+var editingEmpId = null;
 
 // ---------------- Activity log ----------------
 function logActivity(action) {
@@ -36,7 +48,6 @@ function logActivity(action) {
     action: action
   });
   store.set("jems2_log", log.slice(-300));          // keep the latest 300 entries
-  if (typeof renderLog === "function") renderLog();
 }
 
 // ---------------- Utility helpers ----------------
@@ -133,7 +144,7 @@ function saveAll() {
 const titles = {
   dashboard: "Dashboard", employees: "Employees", attendance: "Attendance / Timekeeping",
   cashadvance: "Cash Advance Tracking", payroll: "Payroll Processing", reports: "Reports",
-  usermgmt: "User Management", myportal: "My Portal"
+  myportal: "My Portal"
 };
 
 function go(section) {
@@ -195,25 +206,25 @@ function renderDashboard() {
 
 // ================= MODULE 2: EMPLOYEES (tiimi-style cards) =================
 let searchTerm = "";
-let deptFilter = "";
+let posFilter = "";
 
 function filteredEmployees() {
   return employees.filter(function (e) {
     const q = searchTerm.trim().toLowerCase();
-    const matchQ = !q || (e.fullName + " " + e.position + " " + e.id + " " + (e.department || "") + " " + (e.email || "")).toLowerCase().indexOf(q) !== -1;
-    const matchD = !deptFilter || e.department === deptFilter;
+    const matchQ = !q || (e.fullName + " " + e.position + " " + e.id + " " + (e.email || "")).toLowerCase().indexOf(q) !== -1;
+    const matchD = !posFilter || e.position === posFilter;
     return matchQ && matchD;
   });
 }
 
 function renderEmployees() {
   const list = filteredEmployees();
-  $("#empCountTitle").innerHTML = employees.length + " Employees <span style='font-size:13px;color:#7c8a99;font-weight:600;'>" +
+  $("#empCountTitle").innerHTML = employees.length + (employees.length === 1 ? " Employee " : " Employees ") + "<span style='font-size:13px;color:#7c8a99;font-weight:600;'>" +
     (list.length !== employees.length ? "(" + list.length + " shown)" : "") + "</span>";
 
   const grid = $("#employeeGrid");
   if (!employees.length) {
-    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No employees yet. Add one using the form above.</div>';
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No employees yet. New employees register from the login screen (&ldquo;Register here&rdquo;), or use the + button in the top bar.</div>';
     populateEmployeeOptions();
     return;
   }
@@ -241,7 +252,7 @@ function renderEmployees() {
       '<div class="emp-name">' + e.fullName + '</div>' +
       '<div class="emp-position">' + e.position + '</div>' +
       '<div class="emp-info-grid">' +
-        '<div><div class="k">Department</div><div class="v">' + (e.department || "—") + '</div></div>' +
+        '<div><div class="k">Birthday</div><div class="v">' + (e.birthday ? fmtDate(e.birthday) : "—") + '</div></div>' +
         '<div><div class="k">Date Hired</div><div class="v">' + fmtDate(e.dateHired) + '</div></div>' +
         '<div><div class="k">Employee ID</div><div class="v">' + e.id + '</div></div>' +
         '<div><div class="k">Position</div><div class="v">' + e.position + '</div></div>' +
@@ -277,15 +288,22 @@ document.addEventListener("click", function (ev) {
     const act = actBtn.dataset.menuAct;
     closeAllMenus();
     if (act === "delete") {
-      if (!can("write")) return alert("You need the 'Write' access right to remove employees.");
-      if (confirm("Remove this employee? Attendance and CA records will be kept.")) {
+      if (!can("write")) return alertDialog("Not allowed", "You need the 'Write' access right to remove employees.", "warn");
+      confirmDialog("Remove employee?", "Remove this employee? Attendance and CA records will be kept.", "Remove", true).then(function (yes) {
+        if (!yes) return;
         const gone = getEmp(id);
         employees = employees.filter(function (x) { return x.id !== id; });
+        const portals = users.filter(function (u) { return u.empId === id; });
+        if (portals.length) {
+          users = users.filter(function (u) { return u.empId !== id; });
+          saveUsers();
+          logActivity("Removed My Portal login of " + (gone ? gone.fullName : id));
+        }
         logActivity("Removed employee " + id + " (" + (gone ? gone.fullName : "") + ")");
         if (editingEmpId === id) cancelEmpEdit();
         saveAll();
         renderEmployees(); renderDashboard();
-      }
+      });
     } else if (act === "edit") {
       startEmpEdit(id);
     } else if (act === "attendance") {
@@ -302,14 +320,26 @@ document.addEventListener("click", function (ev) {
 
 $("#employeeForm").addEventListener("submit", function (e) {
   e.preventDefault();                          // only reached when validation passed
+  const first = val("empFirst"), middle = val("empMiddle"), last = val("empLast");
+  const fullName = (first + " " + (middle ? middle + " " : "") + last).replace(/\s+/g, " ").trim();
   const data = {
-    fullName: val("empName"),
-    position: val("empPosition"),
-    department: $("#empDepartment").value,
+    fullName: fullName,
+    firstName: first, middleName: middle, lastName: last,
+    gender: $("#empGender").value,
+    birthday: $("#empBday").value,
+    address: {
+      street: val("empStreet"),
+      barangay: val("empBarangay"),
+      city: $("#empCity").value,
+      region: $("#empRegion").value,
+      postal: val("empPostal"),
+      country: $("#empCountry").value
+    },
+    position: $("#empPosition").value,
     dailyRate: parseFloat($("#empRate").value),
     dateHired: $("#empHired").value || todayISO(),
     email: val("empEmail"),
-    phone: val("empPhone")
+    phone: "0" + val("empPhone")                 // +63 9xx xxx xxxx is stored as 09xxxxxxxxx
   };
   if (editingEmpId) {
     const emp = getEmp(editingEmpId);
@@ -319,45 +349,196 @@ $("#employeeForm").addEventListener("submit", function (e) {
     const num = employees.length ? Math.max.apply(null, employees.map(x => parseInt(x.id.split("-")[1]))) + 1 : 1;
     data.id = "EMP-" + String(num).padStart(3, "0");
     employees.push(data);
-    logActivity("Added employee " + data.id + " (" + data.fullName + ")");
+    logActivity("Added employee " + data.id + " (" + data.fullName + ", " + data.position + ")");
   }
   saveAll();
   renderEmployees(); renderDashboard();
-  cancelEmpEdit();
+  const wasEdit = !!editingEmpId;
+  const targetId = editingEmpId || data.id;
+  const doneMsg = wasEdit ? ("Employee " + targetId + " updated.") : ("Employee " + data.id + " added.");
+  // Portal login (create / update / remove) is part of the same save
+  applyPortalLogin(data, targetId).then(function (note) {
+    closeEmpModal();
+    emsToast(doneMsg + (note ? " " + note : ""));
+  });
 });
 
-// ---- Edit employee: load record into the form ----
-function startEmpEdit(id) {
-  if (!can("write")) return alert("You need the 'Write' access right to edit employees.");
-  const emp = getEmp(id);
-  if (!emp) return;
-  editingEmpId = id;
-  go("employees");
-  $("#empName").value = emp.fullName;
-  $("#empPosition").value = emp.position;
-  $("#empDepartment").value = emp.department;
-  $("#empRate").value = emp.dailyRate;
-  $("#empHired").value = emp.dateHired;
-  $("#empEmail").value = emp.email || "";
-  $("#empPhone").value = emp.phone || "";
-  $("#empFormTitle").textContent = "Edit Employee — " + emp.id;
-  $("#empSubmit").textContent = "Save Changes";
-  $("#empCancel").hidden = false;
-  clearValidation($("#employeeForm"));
-  $("#employeeForm").closest(".card").scrollIntoView({ behavior: "smooth", block: "start" });
-  $("#empName").focus();
+/* Give the employee a My Portal login (or update/remove the one they have).
+   Employees with a login get rights ["read"] and are linked by empId, so the
+   app shows them ONLY their own My Portal. */
+function applyPortalLogin(data, empId) {
+  const username = val("empUsername");
+  const pw = $("#empPortalPassword").value;
+  const linked = users.find(function (u) { return u.empId === empId; });
+
+  if (username) {
+    if (linked) {
+      linked.fullName = data.fullName;
+      linked.username = username;
+      linked.email = data.email;
+      linked.phone = data.phone;
+      if (pw) linked.password = pw;                 // blank = keep the current password
+      saveUsers();
+      logActivity("Updated My Portal login for " + data.fullName + " (" + username + ")" + (pw ? " and reset password" : ""));
+      return Promise.resolve("Portal login updated.");
+    }
+    const num = users.length ? Math.max.apply(null, users.map(function (u) { return parseInt(u.id.split("-")[1]); })) + 1 : 1;
+    users.push({
+      id: "USR-" + String(num).padStart(3, "0"),
+      fullName: data.fullName,
+      username: username,
+      email: data.email,
+      phone: data.phone,
+      password: pw,
+      status: "Active",
+      rights: ["read"],                             // portal-only access
+      expiry: "",
+      empId: empId
+    });
+    saveUsers();
+    logActivity("Created My Portal login for " + data.fullName + " (" + username + ")");
+    return Promise.resolve("Portal login created \u2014 the employee can now sign in.");
+  }
+
+  if (!linked) return Promise.resolve("");
+  return confirmDialog("Remove portal login?", "Clear the My Portal login for " + data.fullName +
+    " (" + linked.username + ")? They will no longer be able to sign in.", "Remove login", true)
+    .then(function (yes) {
+      if (!yes) return "";
+      users = users.filter(function (u) { return u.id !== linked.id; });
+      saveUsers();
+      logActivity("Removed My Portal login of " + data.fullName);
+      return "Portal login removed.";
+    });
 }
-function cancelEmpEdit() {
-  editingEmpId = null;
+
+/* ================================================================
+   FLOATING FORM WINDOWS  (Add / Edit employee and user accounts)
+   ================================================================ */
+function showModal(sel) {
+  const bd = $(sel);
+  bd.hidden = false;
+  document.body.classList.add("modal-open");
+  requestAnimationFrame(function () { bd.classList.add("open"); });
+}
+function hideModal(sel) {
+  const bd = $(sel);
+  bd.classList.remove("open");
+  document.body.classList.remove("modal-open");
+  setTimeout(function () { bd.hidden = true; }, 180);
+}
+function emsToast(msg, kind) {
+  let t = $("#toastBox");
+  if (!t) { t = document.createElement("div"); t.id = "toastBox"; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.className = (kind === "err" ? "err " : "") + "show";
+  clearTimeout(emsToast._t);
+  emsToast._t = setTimeout(function () { t.className = ""; }, 2800);
+}
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Escape") return;
+  if (!$("#regModal").hidden) closeRegModal();
+  else if (!$("#empModal").hidden) closeEmpModal();
+});
+
+// ---- Employee window: reset / fill / open / close ----
+function resetEmpForm() {
   const f = $("#employeeForm");
   f.reset();
+  resetAddressCascade();
+  $("#empRate").dataset.auto = "";
+  $("#empPwLabel").textContent = "Password";
+  $("#empPwHint").textContent = "Letters and numbers, at least 8 characters.";
   $("#empHired").value = todayISO();
   $("#empFormTitle").textContent = "Add New Employee";
   $("#empSubmit").textContent = "Add Employee";
-  $("#empCancel").hidden = true;
+  clearValidation(f);
 }
-$("#empCancel").addEventListener("click", function () { cancelEmpEdit(); clearValidation($("#employeeForm")); });
-$("#empPhone").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 11); });
+function cancelEmpEdit() {
+  editingEmpId = null;
+  resetEmpForm();
+}
+// Older records only had a full name — split it into the composite name parts
+function fillEmpForm(emp) {
+  let first = emp.firstName, middle = emp.middleName, last = emp.lastName;
+  if (!first && !last) {
+    const parts = String(emp.fullName || "").split(/\s+/);
+    first = parts.shift() || "";
+    last = parts.length ? parts.pop() : "";
+    middle = parts.join(" ");
+  }
+  $("#empFirst").value = first || "";
+  $("#empMiddle").value = middle || "";
+  $("#empLast").value = last || "";
+  $("#empGender").value = emp.gender || "";
+  $("#empBday").value = emp.birthday || "";
+  $("#empPhone").value = String(emp.phone || "").replace(/^0+(?=9)/, "");
+  // Restore the saved address into the cascade (country -> region -> city -> barangay + postal)
+  resetAddressCascade();
+  const a = emp.address || {};
+  if (a.country) {
+    $("#empCountry").value = a.country;
+    if (a.country === "Philippines") {
+      fillSelect($("#empRegion"), Object.keys(PH_ADDRESS), "Select a region / state");
+      $("#empRegion").disabled = false;
+      if (a.region) {
+        $("#empRegion").value = a.region;
+        fillSelect($("#empCity"), Object.keys(PH_ADDRESS[a.region] || {}), "Select a city / municipality");
+        $("#empCity").disabled = false;
+        if (a.city) {
+          $("#empCity").value = a.city;
+          $("#empBarangay").disabled = false;
+          $("#empBarangay").placeholder = "e.g. Barangay 8, Purok 2";
+        }
+      }
+    }
+  }
+  $("#empBarangay").value = a.barangay || "";
+  $("#empStreet").value = a.street || "";
+  $("#empPostal").value = a.postal || "";
+  $("#empPosition").value = emp.position || "";
+  $("#empRate").value = emp.dailyRate;
+  $("#empRate").dataset.auto = DEFAULT_RATES[emp.position] || "";
+  $("#empHired").value = emp.dateHired;
+  $("#empEmail").value = emp.email || "";
+  // portal login (if this employee already has one)
+  const linkedLogin = users.find(function (u) { return u.empId === emp.id; });
+  $("#empUsername").value = linkedLogin ? linkedLogin.username : "";
+  $("#empPortalPassword").value = "";
+  $("#empPwLabel").textContent = linkedLogin ? "New Password (leave blank to keep current)" : "Password";
+  $("#empPwHint").textContent = linkedLogin
+    ? "This employee can sign in as \u201c" + linkedLogin.username + "\u201d. Leave blank to keep the current password."
+    : "Letters and numbers, at least 8 characters.";
+}
+function openEmpModal(mode, id) {
+  resetEmpForm();                       // always start from a clean sheet
+  if (mode === "edit") {
+    const emp = getEmp(id);
+    if (!emp) return;
+    editingEmpId = id;
+    fillEmpForm(emp);
+    $("#empFormTitle").textContent = "Edit Employee — " + emp.id;
+    $("#empSubmit").textContent = "Save Changes";
+  } else {
+    editingEmpId = null;
+  }
+  showModal("#empModal");
+  setTimeout(function () { $("#empFirst").focus(); }, 200);
+}
+function closeEmpModal() {
+  hideModal("#empModal");
+  cancelEmpEdit();
+}
+function startEmpEdit(id) {
+  if (!can("write")) return alertDialog("Not allowed", "You need the 'Write' access right to edit employees.", "warn");
+  openEmpModal("edit", id);
+}
+$("#empCancel").addEventListener("click", closeEmpModal);
+// typing/clearing the username changes whether a password is required
+$("#empUsername").addEventListener("input", function () { validateField("employeeForm", "empPortalPassword"); });
+$("#empUsername").addEventListener("change", function () { validateField("employeeForm", "empPortalPassword"); });
+$("#empModalX").addEventListener("click", closeEmpModal);
+$("#empPhone").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").replace(/^0+(?=9)/, "").slice(0, 10); });
 
 // Search + department filter
 $("#globalSearch").addEventListener("input", function () {
@@ -365,15 +546,15 @@ $("#globalSearch").addEventListener("input", function () {
   if (searchTerm.trim()) go("employees");
   renderEmployees();
 });
-$("#deptFilter").addEventListener("change", function () {
-  deptFilter = this.value;
+$("#posFilter").addEventListener("change", function () {
+  posFilter = this.value;
   renderEmployees();
 });
 
-// FAB + New Hire button: jump to employees and focus the name field
+// FAB + Add Employee button: open the registration window
 function focusAddEmployee() {
   go("employees");
-  $("#empName").focus();
+  openEmpModal("add");
 }
 $("#fabAdd").addEventListener("click", focusAddEmployee);
 document.querySelectorAll("[data-focus-add]").forEach(function (b) {
@@ -406,10 +587,10 @@ function renderAttendance() {
 
 $("#btnTimeIn").addEventListener("click", function () {
   const empId = $("#attEmp").value;
-  if (!empId) return alert("Please add and select an employee first.");
+  if (!empId) return alertDialog("No employee selected", "Please add and select an employee first.");
   const today = todayISO();
   if (attendance.some(function (a) { return a.empId === empId && a.date === today; }))
-    return alert("This employee has already timed in today.");
+    return alertDialog("Already timed in", "This employee has already timed in today.", "warn");
   const now = new Date();
   const minutes = now.getHours() * 60 + now.getMinutes();
   const lateMin = Math.max(0, minutes - (8 * 60)); // schedule starts 8:00 AM
@@ -422,11 +603,11 @@ $("#btnTimeIn").addEventListener("click", function () {
 
 $("#btnTimeOut").addEventListener("click", function () {
   const empId = $("#attEmp").value;
-  if (!empId) return alert("Please select an employee first.");
+  if (!empId) return alertDialog("No employee selected", "Please select an employee first.");
   const today = todayISO();
   const rec = attendance.find(function (a) { return a.empId === empId && a.date === today; });
-  if (!rec) return alert("This employee has no time-in record for today.");
-  if (rec.timeOut) return alert("This employee has already timed out today.");
+  if (!rec) return alertDialog("No time-in record", "This employee has no time-in record for today.");
+  if (rec.timeOut) return alertDialog("Already timed out", "This employee has already timed out today.", "warn");
   rec.timeOut = new Date().toISOString();
   saveAll();
   renderAttendance(); renderDashboard();
@@ -560,7 +741,6 @@ if (!employees || !attendance || !cashAdvances) seedSampleData();
 {
   // Backfill newer fields (department, date hired, Gmail, contact no.) for any records
   employees.forEach(function (e, i) {
-    if (!e.department) e.department = "Fabrication";
     if (!e.dateHired) e.dateHired = todayISO();
     if (!e.email) e.email = e.fullName.toLowerCase().replace(/[^a-z]/g, "") + ".joecon@gmail.com";
     if (!e.phone) e.phone = "0917" + String(1000000 + parseInt(e.id.split("-")[1]) * 111111).slice(-7);
@@ -617,13 +797,7 @@ function showLogin() {
 function showApp() {
   $("#loginScreen").classList.remove("open");
   populateUserMenu();
-  renderUserTable();
   applyPermissions();
-  // non-admins must never land on the admin page
-  if (!can("admin")) {
-    const active = document.querySelector(".nav-link.active");
-    if (active && active.dataset.section === "usermgmt") go("dashboard");
-  }
 }
 
 function setLoginError(msg) {
@@ -655,7 +829,6 @@ $("#loginForm").addEventListener("submit", function (e) {
     else localStorage.removeItem("jems2_remember");
   } catch (err) {}
   $("#loginPass").value = "";
-  newMfaCode();
   setLoginError("");
   showApp();
 });
@@ -717,7 +890,6 @@ function applyPermissions() {
   const missing = [];
   if (!can("write"))   missing.push("add records (Write)");
   if (!can("execute")) missing.push("time-in/out & payroll (Execute)");
-  if (!can("admin"))   missing.push("user management (Admin)");
   const banner = $("#permBanner");
   if (missing.length) {
     banner.hidden = false;
@@ -726,167 +898,6 @@ function applyPermissions() {
     banner.hidden = true;
   }
 }
-
-// ---------------- Form 1: Add User ----------------
-function setFormMsg(id, msg, ok) {
-  const el = $(id);
-  el.textContent = msg;
-  el.className = "form-msg " + (ok ? "ok" : "err");
-}
-
-$("#userForm").addEventListener("submit", function (e) {
-  e.preventDefault();                          // only reached when validation passed
-  const data = {
-    fullName: val("uFullName"),
-    username: val("uUsername"),
-    email: val("uEmail"),
-    department: $("#uDepartment").value,
-    phone: val("uPhone"),
-    status: $("#uStatus").value
-  };
-  const pw = $("#uPassword").value;
-  if (editingUserId) {
-    const u = users.find(function (x) { return x.id === editingUserId; });
-    if (u.id === "USR-001" && data.status !== "Active") return setFormMsg("#userFormMsg", "The default admin account must stay Active.", false);
-    Object.assign(u, data);
-    if (pw) u.password = pw;                   // blank = keep current password
-    logActivity("Updated user " + u.id + " (" + u.username + ")" + (pw ? " and reset password" : ""));
-    setFormMsg("#userFormMsg", "User " + u.username + " updated.", true);
-    if (currentUser && currentUser.id === u.id) populateUserMenu();
-  } else {
-    const num = users.length ? Math.max.apply(null, users.map(function (u) { return parseInt(u.id.split("-")[1]); })) + 1 : 1;
-    data.id = "USR-" + String(num).padStart(3, "0");
-    data.password = pw; data.rights = ["read"]; data.expiry = "";
-    users.push(data);
-    logActivity("Added user " + data.id + " (" + data.username + ")");
-    setFormMsg("#userFormMsg", "User " + data.username + " added (default: Read only). Assign access rights in Form 2.", true);
-  }
-  saveUsers();
-  renderUserTable();
-  populateUserSelect();
-  cancelUserEdit(true);
-});
-
-function startUserEdit(id) {
-  const u = users.find(function (x) { return x.id === id; });
-  if (!u) return;
-  editingUserId = id;
-  $("#uFullName").value = u.fullName || "";
-  $("#uUsername").value = u.username;
-  $("#uEmail").value = u.email;
-  $("#uDepartment").value = u.department;
-  $("#uPhone").value = u.phone || "";
-  $("#uPassword").value = "";
-  $("#uStatus").value = u.status;
-  $("#userFormTitle").textContent = "Edit User — " + u.id;
-  $("#uPasswordLabel").textContent = "New Password (leave blank to keep current)";
-  $("#userSubmit").textContent = "Save Changes";
-  $("#userCancel").hidden = false;
-  clearValidation($("#userForm"));
-  $("#userFormMsg").textContent = "";
-  $("#userForm").closest(".card").scrollIntoView({ behavior: "smooth", block: "start" });
-  $("#uFullName").focus();
-}
-function cancelUserEdit(keepMsg) {
-  editingUserId = null;
-  $("#userForm").reset();
-  $("#userFormTitle").innerHTML = "Form 1 &mdash; Add User";
-  $("#uPasswordLabel").textContent = "Initial Password";
-  $("#userSubmit").textContent = "Add User";
-  $("#userCancel").hidden = true;
-  if (!keepMsg) $("#userFormMsg").textContent = "";
-}
-$("#userCancel").addEventListener("click", function () { cancelUserEdit(); clearValidation($("#userForm")); });
-
-// ---------------- Form 2: Role & Access Assignment ----------------
-function populateUserSelect() {
-  $("#rUserId").innerHTML = users.map(function (u) {
-    return '<option value="' + u.id + '">' + u.id + ' — ' + u.username + '</option>';
-  }).join("");
-  loadRoleForm();
-}
-
-function loadRoleForm() {
-  const id = $("#rUserId").value;
-  const u = users.find(function (x) { return x.id === id; });
-  document.querySelectorAll(".acc-chk").forEach(function (c) { c.checked = !!(u && u.rights.indexOf(c.value) !== -1); });
-  $("#rExpiry").value = u ? (u.expiry || "") : "";
-}
-
-$("#rUserId").addEventListener("change", loadRoleForm);
-
-$("#roleForm").addEventListener("submit", function (e) {
-  e.preventDefault();
-  const id = $("#rUserId").value;
-  const u = users.find(function (x) { return x.id === id; });
-  if (!u) return;
-  u.rights = Array.from(document.querySelectorAll(".acc-chk:checked")).map(function (c) { return c.value; });
-  if (u.rights.indexOf("read") === -1) u.rights.unshift("read");
-  u.expiry = $("#rExpiry").value;
-  logActivity("Set access rights for " + u.username + ": " + u.rights.join(", ") + (u.expiry ? " (expires " + u.expiry + ")" : ""));
-  saveUsers();
-  renderUserTable();
-  populateUserMenu && currentUser && currentUser.id === u.id && populateUserMenu();
-  applyPermissions();
-  setFormMsg("#roleFormMsg", "Access rights updated for " + u.username + ": " + u.rights.map(function (r) { return ACCESS_LABELS[r]; }).join(", ") + ".", true);
-});
-
-// ---------------- Users table ----------------
-function renderUserTable() {
-  $("#userTable").innerHTML = users.length
-    ? users.map(function (u) {
-        const badges = (u.rights.length ? u.rights : ["read"]).map(function (r) {
-          return '<span class="perm-badge ' + r + '">' + ACCESS_LABELS[r] + "</span>";
-        }).join("");
-        const exp = isExpired(u)
-          ? '<span class="status-pill inactive">Expired ' + fmtDate(u.expiry) + "</span>"
-          : (u.expiry ? fmtDate(u.expiry) : "No expiry");
-        const isMe = currentUser && currentUser.id === u.id;
-        const delBtn =
-          (u.status === "Pending" ? '<button class="btn btn-sm btn-green" data-approve-user="' + u.id + '">Approve</button> ' : "") +
-          '<button class="btn btn-outline btn-sm" data-edit-user="' + u.id + '">Edit</button> ' +
-          (isMe ? '<span class="note" style="margin:0;">(you)</span>'
-                : '<button class="btn btn-outline btn-sm" data-del-user="' + u.id + '">Remove</button>');
-        return "<tr>" +
-          "<td><strong>" + u.id + "</strong></td>" +
-          "<td>" + (u.fullName || "—") + "</td>" +
-          "<td>" + u.username + "</td>" +
-          "<td>" + u.email + "</td>" +
-          "<td>" + u.department + "</td>" +
-          "<td>" + badges + "</td>" +
-          "<td>" + exp + "</td>" +
-          "<td><span class='status-pill " + u.status.toLowerCase() + "'>" + u.status + "</span></td>" +
-          '<td class="text-right">' + delBtn + "</td>" +
-        "</tr>";
-      }).join("")
-    : '<tr><td colspan="9" class="empty">No users yet.</td></tr>';
-  const pending = users.filter(function (u) { return u.status === "Pending"; }).length;
-  $("#pendingCount").hidden = !pending;
-  $("#pendingCount").textContent = pending + " pending approval";
-}
-
-document.addEventListener("click", function (e) {
-  const approveId = e.target.dataset.approveUser;
-  if (approveId) {
-    const u = users.find(function (x) { return x.id === approveId; });
-    u.status = "Active";
-    saveUsers(); renderUserTable();
-    logActivity("Approved registration of " + u.username);
-    return;
-  }
-  if (e.target.dataset.editUser) return startUserEdit(e.target.dataset.editUser);
-  const id = e.target.dataset.delUser;
-  if (!id) return;
-  if (id === "USR-001") return alert("The default admin account cannot be removed.");
-  if (!confirm("Remove this user account?")) return;
-  const gone = users.find(function (x) { return x.id === id; });
-  users = users.filter(function (x) { return x.id !== id; });
-  logActivity("Removed user " + id + " (" + (gone ? gone.username : "") + ")");
-  if (editingUserId === id) cancelUserEdit();
-  saveUsers();
-  renderUserTable();
-  populateUserSelect();
-});
 
 // ---------------- Auth init ----------------
 (function initAuth() {
@@ -899,8 +910,6 @@ document.addEventListener("click", function (e) {
     u.email = u.email.toLowerCase();
   });
   saveUsers();
-  renderUserTable();
-  populateUserSelect();
 
   // restore session (Remember me keeps the same session id)
   const session = store.get("jems2_session", null);
@@ -969,34 +978,75 @@ function checkGmail(v, list, selfId) {
 
 // Each rule returns an error message ("" = valid)
 const RULES = {
+  loginForm: {
+    loginUser: function (v) {
+      if (!v) return "Username or email is required.";
+      if (v.indexOf("@") !== -1) { const g = checkGmailFormat(v); if (g) return g; }
+      if (v.length < 3) return "Username must be at least 3 characters.";
+      return "";
+    },
+    loginPass: function (v) { return v ? "" : "Password must not be blank."; }
+  },
+
   registerForm: {
-    regName: function (v) {
-      if (!v) return "Full name is required.";
-      if (v.length < 3) return "Full name must be at least 3 characters.";
+    regFirst: function (v) {
+      if (!v) return "First name is required.";
+      if (v.length < 2) return "First name must be at least 2 characters.";
       if (!NAME_RE.test(v)) return "Use letters, spaces, periods, hyphens or apostrophes only.";
       return "";
     },
+    regLast: function (v) {
+      if (!v) return "Last name is required.";
+      if (v.length < 2) return "Last name must be at least 2 characters.";
+      if (!NAME_RE.test(v)) return "Use letters, spaces, periods, hyphens or apostrophes only.";
+      return "";
+    },
+    regMiddle: function (v) {
+      if (v && !NAME_RE.test(v)) return "Use letters, spaces, periods, hyphens or apostrophes only.";
+      return "";
+    },
+    regGender: function (v) { return v ? "" : "Please select a gender."; },
+    regBday: function (v) {
+      if (!v) return "Birthday is required.";
+      if (v > todayISO()) return "Birthday cannot be in the future.";
+      if (v < "1940-01-01") return "Please enter a valid birthday.";
+      const age = (Date.now() - new Date(v + "T00:00:00").getTime()) / 31557600000;
+      if (age < 18) return "Employees must be at least 18 years old.";
+      if (age > 75) return "Please double-check the birthday entered.";
+      return "";
+    },
+    regPhone: function (v) {
+      if (!v) return "Phone number is required.";
+      if (!/^9\d{9}$/.test(v)) return "Enter 10 digits starting with 9 (e.g. 9175550182) \u2014 +63 is already prefixed.";
+      if (employees.some(function (x) { return x.phone === "0" + v; })) return "This contact number is already registered.";
+      return "";
+    },
+    regCountry: function (v) { return v ? "" : "Please select your country."; },
+    regRegion: function (v) { return v ? "" : "Please select your region / state."; },
+    regCity: function (v) { return v ? "" : "Please select your city / municipality."; },
+    regBarangay: function (v) {
+      if (!v) return "Barangay is required.";
+      if (v.length < 2) return "Barangay must be at least 2 characters.";
+      return "";
+    },
+    regStreet: function (v) {
+      if (!v) return "Street / house no. is required.";
+      if (v.length < 5) return "Please enter a more complete street address.";
+      return "";
+    },
+    regPostal: function (v) {
+      if (!v) return "Postal code is required.";
+      if (!/^\d{4}$/.test(v)) return "Postal code must be 4 digits (e.g. 9506).";
+      return "";
+    },
+    regPosition: function (v) { return v ? "" : "Please select your position / job title."; },
+    regEmail: function (v) { return checkGmail(v) || checkGmail(v, employees); },
     regUsername: function (v) {
       if (!v) return "Username is required.";
-      if (v.length < 4 || v.length > 20) return "Username must be 4–20 characters long.";
+      if (v.length < 4 || v.length > 20) return "Username must be 4\u201320 characters long.";
       if (/[A-Z]/.test(v)) return "Capital letters are not allowed. Use lowercase only (e.g. j.delacruz).";
-      if (!USERNAME_RE.test(v)) return "Lowercase letters, numbers, dots or underscores only. No spaces.";
-      if (users.some(function (u) { return u.username.toLowerCase() === v.toLowerCase(); })) return "This username is already taken.";
-      return "";
-    },
-    regDepartment: function (v) { return v ? "" : "Please select your department."; },
-    regPosition: function (v) { return v ? "" : "Please select your position / job title."; },
-    regHired: function (v) {
-      if (!v) return "Date hired is required.";
-      if (v > todayISO()) return "Date hired cannot be a future date.";
-      if (v < "1990-01-01") return "Date hired must be on or after Jan 1, 1990.";
-      return "";
-    },
-    regEmail: function (v) { return checkGmail(v) || checkGmail(v, employees); },
-    regPhone: function (v) {
-      if (!v) return "Contact number is required.";
-      if (!PHONE_RE.test(v)) return "Enter 11 digits starting with 09 (e.g. 09171234567).";
-      if (employees.some(function (x) { return x.phone === v; })) return "This contact number is already used by another employee.";
+      if (!USERNAME_RE.test(v)) return "Use only lowercase letters, numbers, dots (.) or underscores (_). No spaces.";
+      if (users.some(function (u) { return u.username.toLowerCase() === v.toLowerCase(); })) return "This username is already taken. Choose another.";
       return "";
     },
     regPassword: function (v) {
@@ -1007,106 +1057,97 @@ const RULES = {
     },
     regConfirm: function (v) {
       if (!v) return "Please confirm your password.";
-      if (v !== document.getElementById("regPassword").value) return "Passwords do not match.";
+      if (v !== $("#regPassword").value) return "Passwords do not match.";
       return "";
     },
     regTerms: function () {
-      return document.getElementById("regTerms").checked ? "" : "Please tick the box to confirm your details.";
-    }
-  },
-
-  loginForm: {
-    loginUser: function (v) {
-      if (!v) return "Username or email is required.";
-      if (v.indexOf("@") !== -1) { const g = checkGmailFormat(v); if (g) return g; }
-      if (v.length < 3) return "Username must be at least 3 characters.";
-      return "";
-    },
-    loginPass: function (v) { return v ? "" : "Password must not be blank."; },
-    loginMfa: function (v) {
-      if (!v) return "Verification code is required.";
-      if (!/^\d+$/.test(v)) return "The code must contain numbers only.";
-      if (v.length !== 6) return "The code must be exactly 6 digits (" + v.length + "/6).";
-      if (v !== currentMfa) return "Incorrect code. Enter the 6-digit code shown below.";
-      return "";
-    }
-  },
-
-  userForm: {
-    uFullName: function (v) {
-      if (!v) return "Full name cannot be empty.";
-      if (v.length < 3) return "Full name must be at least 3 characters.";
-      if (!NAME_RE.test(v)) return "Name may contain letters, spaces, periods, hyphens and apostrophes only.";
-      return "";
-    },
-    uUsername: function (v) {
-      if (!v) return "Username is required.";
-      if (v.length < 4 || v.length > 20) return "Username must be 4–20 characters long.";
-      if (/[A-Z]/.test(v)) return "Capital letters are not allowed. Use lowercase only (e.g. j.delacruz).";
-      if (!USERNAME_RE.test(v)) return "Use only lowercase letters, numbers, dots (.) or underscores (_). No spaces.";
-      if (users.some(function (u) { return u.id !== editingUserId && u.username.toLowerCase() === v.toLowerCase(); })) return "This username is already taken. Choose another.";
-      return "";
-    },
-    uEmail: function (v) { return checkGmail(v, users, editingUserId); },
-    uDepartment: function (v) { return v ? "" : "Please select a department from the list."; },
-    uPhone: function (v) {
-      if (!v) return "Contact number is required.";
-      if (!/^\d+$/.test(v)) return "Contact number must contain digits only (no spaces or dashes).";
-      if (!PHONE_RE.test(v)) return "Enter an 11-digit PH mobile number starting with 09 (e.g. 09171234567).";
-      return "";
-    },
-    uPassword: function (v) {
-      if (!v && editingUserId) return "";      // editing: blank keeps the current password
-      if (!v) return "Initial password is required.";
-      if (v.length < 8) return "Password must contain at least 8 characters (" + v.length + "/8).";
-      if (!/[A-Za-z]/.test(v) || !/\d/.test(v)) return "Password must include at least one letter and one number.";
-      return "";
-    },
-    uStatus: function (v) { return v ? "" : "Please select a status."; }
-  },
-
-  roleForm: {
-    rUserId: function (v) { return v ? "" : "User ID must not be empty. Select a user."; },
-    accessRights: function () {
-      return document.querySelectorAll(".acc-chk:checked").length ? "" : "Select at least one access right.";
-    },
-    rExpiry: function (v) {
-      if (v && v < todayISO()) return "Expiration date cannot be in the past. Pick today or a future date.";
-      return "";
+      return $("#regTerms").checked ? "" : "Please tick the box to confirm your details.";
     }
   },
 
   employeeForm: {
-    empName: function (v) {
-      if (!v) return "Full name is required.";
-      if (v.length < 3) return "Full name must be at least 3 characters.";
-      if (!NAME_RE.test(v)) return "Name may contain letters, spaces, periods, hyphens and apostrophes only.";
+    empFirst: function (v) {
+      if (!v) return "First name is required.";
+      if (v.length < 2) return "First name must be at least 2 characters.";
+      if (!NAME_RE.test(v)) return "Use letters, spaces, periods, hyphens or apostrophes only.";
       return "";
     },
-    empPosition: function (v) {
-      if (!v) return "Position / job title is required.";
-      if (v.length < 2) return "Position must be at least 2 characters.";
+    empLast: function (v) {
+      if (!v) return "Last name is required.";
+      if (v.length < 2) return "Last name must be at least 2 characters.";
+      if (!NAME_RE.test(v)) return "Use letters, spaces, periods, hyphens or apostrophes only.";
       return "";
     },
-    empDepartment: function (v) { return v ? "" : "Please select a department."; },
+    empMiddle: function (v) {
+      if (v && !NAME_RE.test(v)) return "Use letters, spaces, periods, hyphens or apostrophes only.";
+      return "";
+    },
+    empGender: function (v) { return v ? "" : "Please select a gender."; },
+    empBday: function (v) {
+      if (!v) return "Birthday is required.";
+      if (v > todayISO()) return "Birthday cannot be in the future.";
+      if (v < "1940-01-01") return "Please enter a valid birthday.";
+      const age = (Date.now() - new Date(v + "T00:00:00").getTime()) / 31557600000;
+      if (age < 18) return "Employees must be at least 18 years old.";
+      if (age > 75) return "Please double-check the birthday entered.";
+      return "";
+    },
+    empPhone: function (v) {
+      if (!v) return "Phone number is required.";
+      if (!/^9\d{9}$/.test(v)) return "Enter 10 digits starting with 9 (e.g. 9175550182) \u2014 +63 is already prefixed.";
+      if (employees.some(function (x) { return x.id !== editingEmpId && x.phone === "0" + v; })) return "This contact number is already used by another employee.";
+      return "";
+    },
+    empCountry: function (v) { return v ? "" : "Please select a country."; },
+    empRegion: function (v) { return v ? "" : "Please select a region / state."; },
+    empCity: function (v) { return v ? "" : "Please select a city / municipality."; },
+    empBarangay: function (v) {
+      if (!v) return "Barangay is required.";
+      if (v.length < 2) return "Barangay must be at least 2 characters.";
+      return "";
+    },
+    empStreet: function (v) {
+      if (!v) return "Street / house no. is required.";
+      if (v.length < 5) return "Please enter a more complete street address.";
+      return "";
+    },
+    empPostal: function (v) {
+      if (!v) return "Postal code is required.";
+      if (!/^\d{4}$/.test(v)) return "Postal code must be 4 digits (e.g. 9506).";
+      return "";
+    },
+    empPosition: function (v) { return v ? "" : "Please select a position."; },
     empRate: function (v) {
       if (!v) return "Daily rate is required.";
       const n = Number(v);
       if (isNaN(n)) return "Daily rate must be a number.";
-      if (n < 300 || n > 5000) return "Daily rate must be between ₱300 and ₱5,000.";
-      return "";
-    },
-    empEmail: function (v) { return checkGmail(v, employees, editingEmpId); },
-    empPhone: function (v) {
-      if (!v) return "Contact number is required.";
-      if (!PHONE_RE.test(v)) return "Enter an 11-digit PH mobile number starting with 09 (e.g. 09171234567).";
-      if (employees.some(function (x) { return x.id !== editingEmpId && x.phone === v; })) return "This contact number is already used by another employee.";
+      if (n < 300 || n > 5000) return "Daily rate must be between \u20b1300 and \u20b15,000.";
       return "";
     },
     empHired: function (v) {
       if (!v) return "Date hired is required.";
       if (v > todayISO()) return "Date hired cannot be a future date.";
       if (v < "1990-01-01") return "Date hired must be on or after Jan 1, 1990.";
+      return "";
+    },
+    empEmail: function (v) { return checkGmail(v, employees, editingEmpId); },
+    empUsername: function (v) {
+      if (!v) return "";                              // optional: no login for this employee
+      if (v.length < 4 || v.length > 20) return "Username must be 4\u201320 characters long.";
+      if (/[A-Z]/.test(v)) return "Capital letters are not allowed. Use lowercase only (e.g. b.magbanua).";
+      if (!USERNAME_RE.test(v)) return "Use only lowercase letters, numbers, dots (.) or underscores (_). No spaces.";
+      const linked = editingEmpId ? users.find(function (u) { return u.empId === editingEmpId; }) : null;
+      if (users.some(function (u) { return u.username.toLowerCase() === v.toLowerCase() && (!linked || u.id !== linked.id); }))
+        return "This username is already taken. Choose another.";
+      return "";
+    },
+    empPortalPassword: function (v) {
+      const linked = editingEmpId ? users.find(function (u) { return u.empId === editingEmpId; }) : null;
+      const wantsLogin = ($("#empUsername") ? $("#empUsername").value : "").trim() !== "";
+      if (!wantsLogin) return v ? "Add a username above, or leave the password blank." : "";
+      if (!v) return linked ? "" : "Password is required to create the portal login.";
+      if (v.length < 8) return "Password must contain at least 8 characters (" + v.length + "/8).";
+      if (!/[A-Za-z]/.test(v) || !/\d/.test(v)) return "Password must include at least one letter and one number.";
       return "";
     }
   },
@@ -1152,16 +1193,16 @@ const RULES = {
 
 // Where to place the message / which element to highlight
 function fieldTarget(id) {
-  if (id === "accessRights") return document.querySelector("#roleForm .checkbox-row");
   if (id === "regTerms") return document.getElementById("regTerms").closest(".remember");
   const el = document.getElementById(id);
-  return el && el.closest(".pw-wrap") ? el.closest(".pw-wrap") : el;
+  if (!el) return null;
+  return el.closest(".pw-wrap") || el.closest(".phone-group") || el;
 }
 
 function showFieldState(id, msg) {
   const target = fieldTarget(id);
   if (!target) return;
-  const input = (id === "accessRights" || id === "regTerms") ? target : document.getElementById(id);
+  const input = (id === "regTerms") ? target : document.getElementById(id);
   let err = target.parentNode.querySelector('.field-error[data-for="' + id + '"]');
   if (!err) {
     err = document.createElement("small");
@@ -1190,7 +1231,7 @@ function validateForm(form) {
     if (!validateField(form.id, id) && !firstBad) firstBad = id;
   });
   if (firstBad) {
-    const el = firstBad === "accessRights" ? document.querySelector(".acc-chk") : document.getElementById(firstBad);
+    const el = document.getElementById(firstBad);
     if (el) el.focus();
   }
   return !firstBad;
@@ -1239,12 +1280,6 @@ document.addEventListener("submit", function (e) {
 // 2) Live feedback: validate on blur, re-check while typing once a field was flagged
 Object.keys(RULES).forEach(function (formId) {
   Object.keys(RULES[formId]).forEach(function (id) {
-    if (id === "accessRights") {
-      document.querySelectorAll(".acc-chk").forEach(function (c) {
-        c.addEventListener("change", function () { validateField(formId, id); });
-      });
-      return;
-    }
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener("blur", function () { if (el.value !== "" || el.classList.contains("is-invalid")) validateField(formId, id); });
@@ -1254,11 +1289,8 @@ Object.keys(RULES).forEach(function (formId) {
 });
 
 // 3) Input constraints that depend on today's date
-$("#rExpiry").min = todayISO();
 $("#empHired").max = todayISO();
 $("#caDate").max = todayISO();
-// Digits only in the phone box
-$("#uPhone").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 11); });
 
 // Pre-create empty message slots so the layout doesn't shift when an error appears
 Object.keys(RULES).forEach(function (formId) {
@@ -1273,83 +1305,289 @@ Object.keys(RULES).forEach(function (formId) {
 });
 
 
+
 /* ================================================================
-   REGISTRATION PAGE
+   EMPLOYEE SELF-REGISTRATION  (opened from the login screen)
+   Creates BOTH the employee record and their My Portal login.
+   Employees sign in with rights ["read"] and see only My Portal.
    ================================================================ */
-function showAuthCard(which) {
-  $("#loginCard").hidden = which !== "login";
-  $("#registerCard").hidden = which !== "register";
-  $("#loginScreen").scrollTop = 0;
+function openRegModal() {
+  $("#registerForm").reset();
+  clearValidation($("#registerForm"));
+  $("#regPwBar").style.width = "0";
+  $("#regPwBar").className = "";
+  resetRegCascade();
+  $("#regCountry").value = "";
+  $("#regBday").max = todayISO();
+  showModal("#regModal");
+  setTimeout(function () { $("#regFirst").focus(); }, 200);
 }
-$("#showRegister").addEventListener("click", function (e) { e.preventDefault(); showAuthCard("register"); $("#regName").focus(); });
-$("#showLogin").addEventListener("click", function (e) { e.preventDefault(); showAuthCard("login"); });
+function closeRegModal() { hideModal("#regModal"); }
+$("#showRegister").addEventListener("click", function (e) { e.preventDefault(); openRegModal(); });
+$("#regToLogin").addEventListener("click", function (e) { e.preventDefault(); closeRegModal(); });
+$("#regCancel").addEventListener("click", closeRegModal);
+$("#regModalX").addEventListener("click", closeRegModal);
 
-$("#regPhone").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 11); });
-$("#regTerms").addEventListener("change", function () { validateField("registerForm", "regTerms"); });
+// +63 phone box
+$("#regPhone").addEventListener("input", function () {
+  this.value = this.value.replace(/\D/g, "").replace(/^0+(?=9)/, "").slice(0, 10);
+});
 
-// Password strength meter
+/* ---- address cascade: Country -> Region -> City/Municipality -> Barangay + postal ---- */
+function resetRegCityLevel() {
+  const city = $("#regCity"), bgy = $("#regBarangay");
+  fillSelect(city, [], "Select a region first"); city.disabled = true;
+  bgy.value = ""; bgy.disabled = true; bgy.placeholder = "Select a city first";
+  $("#regPostal").value = "";
+}
+function resetRegCascade() {
+  const region = $("#regRegion");
+  fillSelect(region, [], "Select a country first"); region.disabled = true;
+  resetRegCityLevel();
+}
+$("#regCountry").addEventListener("change", function () {
+  const region = $("#regRegion");
+  if (this.value === "Philippines") {
+    fillSelect(region, Object.keys(PH_ADDRESS), "Select a region / state");
+    region.disabled = false;
+  } else {
+    resetRegCascade();
+  }
+  resetRegCityLevel();
+});
+$("#regRegion").addEventListener("change", function () {
+  const city = $("#regCity"), bgy = $("#regBarangay");
+  fillSelect(city, Object.keys(PH_ADDRESS[this.value] || {}), "Select a city / municipality");
+  city.disabled = false;
+  bgy.value = ""; bgy.disabled = true; bgy.placeholder = "Select a city first";
+  $("#regPostal").value = "";
+});
+$("#regCity").addEventListener("change", function () {
+  const bgy = $("#regBarangay");
+  bgy.disabled = false;
+  bgy.placeholder = "e.g. Barangay 8, Purok 2";
+  $("#regPostal").value = (PH_ADDRESS[$("#regRegion").value] || {})[this.value] || "";
+});
+
+// password strength meter + live re-check of the confirmation
 $("#regPassword").addEventListener("input", function () {
   const v = this.value; let score = 0;
   if (v.length >= 8) score++;
   if (/[A-Za-z]/.test(v) && /\d/.test(v)) score++;
   if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++;
   if (/[^A-Za-z0-9]/.test(v) || v.length >= 12) score++;
-  const bar = $("#pwMeterBar");
+  const bar = $("#regPwBar");
   bar.style.width = (v ? score * 25 : 0) + "%";
   bar.className = ["", "weak", "fair", "good", "strong"][score];
   if ($("#regConfirm").value) validateField("registerForm", "regConfirm");
 });
+$("#regTerms").addEventListener("change", function () { validateField("registerForm", "regTerms"); });
 
+// ---- submit: create the employee record + their portal login ----
 $("#registerForm").addEventListener("submit", function (e) {
-  e.preventDefault();                       // only reached when validation passed
-  // 1) Create the EMPLOYEE record (the applicant becomes a new employee right away)
-  const empNum = employees.length ? Math.max.apply(null, employees.map(function (x) { return parseInt(x.id.split("-")[1]); })) + 1 : 1;
+  e.preventDefault();                          // only reached when validation passed
+  const first = val("regFirst"), middle = val("regMiddle"), last = val("regLast");
+  const fullName = (first + " " + (middle ? middle + " " : "") + last).replace(/\s+/g, " ").trim();
   const position = $("#regPosition").value;
+  const username = val("regUsername").toLowerCase();
+
+  // 1) the employee record
+  const empNum = employees.length ? Math.max.apply(null, employees.map(function (x) { return parseInt(x.id.split("-")[1]); })) + 1 : 1;
   const emp = {
     id: "EMP-" + String(empNum).padStart(3, "0"),
-    fullName: val("regName"),
+    fullName: fullName,
+    firstName: first, middleName: middle, lastName: last,
+    gender: $("#regGender").value,
+    birthday: $("#regBday").value,
+    address: {
+      street: val("regStreet"),
+      barangay: val("regBarangay"),
+      city: $("#regCity").value,
+      region: $("#regRegion").value,
+      postal: val("regPostal"),
+      country: $("#regCountry").value
+    },
     position: position,
-    department: $("#regDepartment").value,
-    dailyRate: DEFAULT_RATES[position] || 500,   // admin can adjust later in Employees > Edit
-    dateHired: $("#regHired").value,
+    dailyRate: DEFAULT_RATES[position] || 500,   // admin can adjust later in Edit Details
+    dateHired: todayISO(),
     email: val("regEmail"),
-    phone: val("regPhone")
+    phone: "0" + val("regPhone")                 // stored as 09xxxxxxxxx
   };
   employees.push(emp);
   saveAll();
 
-  // 2) Create the linked USER ACCOUNT so the employee can open My Portal
-  const num = Math.max.apply(null, users.map(function (u) { return parseInt(u.id.split("-")[1]); })) + 1;
-  const u = {
+  // 2) their My Portal login
+  const num = users.length ? Math.max.apply(null, users.map(function (u) { return parseInt(u.id.split("-")[1]); })) + 1 : 1;
+  users.push({
     id: "USR-" + String(num).padStart(3, "0"),
-    fullName: emp.fullName,
-    username: val("regUsername"),
+    fullName: fullName,
+    username: username,
     email: emp.email,
-    department: emp.department,
     phone: emp.phone,
     password: $("#regPassword").value,
     status: "Active",
-    rights: ["read"],               // employee access: My Portal only
+    rights: ["read"],                          // portal-only access
     expiry: "",
     empId: emp.id
-  };
-  users.push(u);
-  logActivity("New employee registered: " + emp.id + " " + emp.fullName + " (" + emp.position + ", " + emp.department + ")");
-  saveUsers(); renderUserTable(); populateUserSelect();
-  renderEmployees(); renderDashboard(); populateEmployeeOptions();
+  });
+  saveUsers();
+  logActivity("New employee registered: " + emp.id + " " + fullName + " (" + position + ") as " + username);
 
-  e.target.reset(); clearValidation(e.target);
-  $("#regHired").value = todayISO();
-  $("#pwMeterBar").style.width = "0";
+  renderEmployees(); renderDashboard(); populateEmployeeOptions();
+  closeRegModal();
+
+  // 3) send them to the sign-in form, pre-filled
+  e.target.reset();
+  clearValidation(e.target);
+  $("#regPwBar").style.width = "0";
+  $("#regPwBar").className = "";
+  resetRegCascade();
   showAuthCard("login");
-  $("#loginUser").value = u.username;
+  $("#loginUser").value = username;
+  $("#loginPass").value = "";
   $("#loginPass").focus();
   const el = $("#loginError");
-  el.textContent = "Registration successful! Welcome to Joecon's, " + emp.fullName.split(" ")[0] + ". You are now employee " + emp.id + ". Sign in to open your portal.";
+  el.textContent = "Registration successful! Welcome, " + first + " \u2014 you are now " + emp.id +
+                   ". Sign in to open your My Portal.";
   el.classList.add("show", "success");
+  emsToast("Registered " + emp.id + " \u2014 portal login " + username + " created.");
 });
 $("#loginForm").addEventListener("submit", function () { $("#loginError").classList.remove("success"); }, true);
 
+/* ---- switching between the sign-in card and the register window ---- */
+function showAuthCard(which) {
+  $("#loginCard").hidden = which !== "login";
+  $("#loginScreen").scrollTop = 0;
+}
+
+/* ================================================================
+   EMPLOYEE FORM — composite address cascade
+   Country -> Region / State -> City/Municipality -> Barangay + postal code
+   ================================================================ */
+/* ---- Composite address cascade: Country -> Region -> City/Municipality -> Barangay + postal code ---- */
+var PH_ADDRESS = {
+  "Metro Manila (NCR)": { "Manila": "1000", "Quezon City": "1100", "Makati City": "1200", "Taguig City": "1630", "Pasig City": "1600", "Caloocan City": "1400", "Pasay City": "1300", "Parañaque City": "1700", "Las Piñas City": "1740", "Muntinlupa City": "1770", "Marikina City": "1800", "San Juan City": "1500", "Valenzuela City": "1440", "Malabon City": "1470", "Navotas City": "1485", "Pateros": "1620" },
+  "Cordillera (CAR)": { "Baguio City": "2600", "La Trinidad": "2601", "Tabuk City": "3800", "Banaue": "3601", "Bontoc": "2616", "Lagawe": "3600" },
+  "Ilocos (Region I)": { "San Fernando (La Union)": "2500", "Vigan City": "2700", "Laoag City": "2900", "Dagupan City": "2400", "Alaminos City": "2404", "San Carlos City (Pangasinan)": "2420" },
+  "Cagayan Valley (Region II)": { "Tuguegarao City": "3500", "Ilagan City": "3300", "Cauayan City": "3305", "Santiago City": "3311", "Bayombong": "3700" },
+  "Central Luzon (Region III)": { "San Fernando (Pampanga)": "2000", "Angeles City": "2009", "Olongapo City": "2200", "Tarlac City": "2300", "Cabanatuan City": "3100", "Balanga City": "2100", "Malolos City": "3000", "San Jose del Monte City": "3023" },
+  "CALABARZON (Region IV-A)": { "Antipolo City": "1870", "San Pablo City": "4000", "Calamba City": "4030", "Batangas City": "4200", "Lipa City": "4217", "Lucena City": "4301", "Trece Martires City": "4109", "Imus": "4103", "Dasmariñas City": "4114", "Tagaytay City": "4120" },
+  "MIMAROPA (Region IV-B)": { "Puerto Princesa City": "5300", "Calapan City": "5200", "Roxas (Oriental Mindoro)": "5212", "Boac": "4900", "Coron": "5316" },
+  "Bicol (Region V)": { "Naga City": "4400", "Legazpi City": "4500", "Iriga City": "4431", "Tabaco City": "4511", "Sorsogon City": "4700", "Masbate City": "5400" },
+  "Western Visayas (Region VI)": { "Iloilo City": "5000", "Bacolod City": "6100", "Roxas City": "5800", "Kalibo": "5600", "Passi City": "5802", "San Jose de Buenavista": "5700" },
+  "Central Visayas (Region VII)": { "Cebu City": "6000", "Mandaue City": "6014", "Lapu-Lapu City": "6015", "Toledo City": "6038", "Tagbilaran City": "6300", "Dumaguete City": "6200" },
+  "Eastern Visayas (Region VIII)": { "Tacloban City": "6500", "Ormoc City": "6541", "Catbalogan City": "6700", "Calbayog City": "6710", "Borongan City": "6800" },
+  "Zamboanga Peninsula (Region IX)": { "Zamboanga City": "7000", "Pagadian City": "7016", "Dipolog City": "7100", "Dapitan City": "7101", "Isabela City": "7300" },
+  "Northern Mindanao (Region X)": { "Cagayan de Oro City": "9000", "Iligan City": "9200", "Malaybalay City": "8700", "Valencia City": "8709", "Ozamiz City": "7200" },
+  "Davao (Region XI)": { "Davao City": "8000", "Tagum City": "8100", "Panabo City": "8105", "Digos City": "8002", "Mati City": "8200" },
+  "SOCCSKSARGEN (Region XII)": { "Koronadal City": "9506", "General Santos City": "9500", "Alabel": "9501", "Polomolok": "9504", "Kidapawan City": "9400", "Tacurong City": "9806", "Isulan": "9805" },
+  "Caraga (Region XIII)": { "Butuan City": "8600", "Cabadbaran City": "8605", "Surigao City": "8400", "Bislig City": "8311", "Tandag City": "8300" },
+  "BARMM": { "Cotabato City": "9600", "Lamitan City": "7302", "Bongao": "7503", "Jolo": "7400" }
+};
+
+function fillSelect(sel, items, placeholder) {
+  sel.innerHTML = "";
+  const ph = document.createElement("option");
+  ph.value = ""; ph.textContent = placeholder; ph.disabled = true; ph.selected = true;
+  sel.appendChild(ph);
+  items.forEach(function (name) {
+    const o = document.createElement("option");
+    o.value = name; o.textContent = name;
+    sel.appendChild(o);
+  });
+}
+function resetCityLevel() {
+  const city = $("#empCity"), bgy = $("#empBarangay");
+  fillSelect(city, [], "Select a region first"); city.disabled = true;
+  bgy.value = ""; bgy.disabled = true; bgy.placeholder = "Select a city first";
+  $("#empPostal").value = "";
+}
+function resetAddressCascade() {
+  const region = $("#empRegion");
+  fillSelect(region, [], "Select a country first"); region.disabled = true;
+  resetCityLevel();
+}
+$("#empCountry").addEventListener("change", function () {
+  const region = $("#empRegion");
+  if (this.value === "Philippines") {
+    fillSelect(region, Object.keys(PH_ADDRESS), "Select a region / state");
+    region.disabled = false;
+  } else {
+    resetAddressCascade();
+  }
+  resetCityLevel();
+});
+$("#empRegion").addEventListener("change", function () {
+  const city = $("#empCity"), bgy = $("#empBarangay");
+  fillSelect(city, Object.keys(PH_ADDRESS[this.value] || {}), "Select a city / municipality");
+  city.disabled = false;
+  bgy.value = ""; bgy.disabled = true; bgy.placeholder = "Select a city first";
+  $("#empPostal").value = "";
+});
+$("#empCity").addEventListener("change", function () {
+  const bgy = $("#empBarangay");
+  bgy.disabled = false;
+  bgy.placeholder = "e.g. Barangay 8, Purok 2";
+  $("#empPostal").value = (PH_ADDRESS[$("#empRegion").value] || {})[this.value] || "";
+});
+$("#loginForm").addEventListener("submit", function () { $("#loginError").classList.remove("success"); }, true);
+
+
+/* ================================================================
+   FLOATING DIALOG WINDOW — in-app replacement for alert() / confirm()
+   floatDialog(opts) -> Promise<boolean>
+     opts: { title, message, kind: "warn"|"info"|"ok", choice: bool,
+             okLabel, danger: bool }
+   ================================================================ */
+const FLOAT_ICONS = {
+  warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+  ok:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'
+};
+let floatResolve = null;
+function floatDialog(opts) {
+  opts = opts || {};
+  const bd = $("#floatBackdrop"), okBtn = $("#floatOk"), cancelBtn = $("#floatCancel");
+  if (floatResolve) floatResolve(false);            // a dialog was already open: dismiss it
+  $("#floatTitle").textContent = opts.title || (opts.choice ? "Are you sure?" : "Notice");
+  $("#floatMsg").textContent = opts.message || "";
+  const kind = opts.kind || (opts.choice ? "warn" : "info");
+  const ic = $("#floatIcon");
+  ic.className = "confirm-ic " + kind;
+  ic.innerHTML = FLOAT_ICONS[kind] || FLOAT_ICONS.info;
+  okBtn.textContent = opts.okLabel || "OK";
+  okBtn.className = "btn" + (opts.danger ? " btn-red" : "");
+  cancelBtn.hidden = !opts.choice;
+  bd.hidden = false;
+  requestAnimationFrame(function () { bd.classList.add("open"); });
+  return new Promise(function (resolve) {
+    floatResolve = function (result) {
+      floatResolve = null;
+      bd.classList.remove("open");
+      setTimeout(function () { bd.hidden = true; }, 180);
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      bd.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKey);
+      resolve(result);
+    };
+    function onOk() { floatResolve(true); }
+    function onCancel() { floatResolve(false); }
+    function onBackdrop(e) { if (e.target === bd) floatResolve(!opts.choice); }
+    function onKey(e) { if (e.key === "Escape") floatResolve(!opts.choice); }
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    bd.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKey);
+    (opts.choice ? cancelBtn : okBtn).focus();      // danger-safe default focus
+  });
+}
+function alertDialog(title, message, kind) {
+  return floatDialog({ title: title, message: message, kind: kind || "info", choice: false });
+}
+function confirmDialog(title, message, okLabel, danger) {
+  return floatDialog({ title: title, message: message, okLabel: okLabel, danger: danger, kind: "warn", choice: true });
+}
 
 /* ================================================================
    CHANGE PASSWORD  +  ACTIVITY LOG
@@ -1372,32 +1610,16 @@ $("#cpForm").addEventListener("submit", function (e) {
   saveUsers();
   logActivity("Changed own password");
   closePwModal();
-  alert("Your password has been updated.");
+  alertDialog("Password updated", "Your password has been updated.", "ok");
 });
 
-function renderLog() {
-  const body = document.getElementById("logTable");
-  if (!body) return;
-  const log = store.get("jems2_log", []).slice().reverse().slice(0, 60);
-  body.innerHTML = log.length
-    ? log.map(function (l) {
-        const d = new Date(l.at);
-        return "<tr><td style='white-space:nowrap'>" + fmtDate(l.at.slice(0, 10)) + " " + fmtTime(d) + "</td>" +
-               "<td><strong>" + l.user + "</strong></td><td>" + l.action + "</td></tr>";
-      }).join("")
-    : '<tr><td colspan="3" class="empty">No activity recorded yet.</td></tr>';
-}
-$("#btnClearLog").addEventListener("click", function () {
-  if (!confirm("Clear the entire activity log?")) return;
-  store.set("jems2_log", []);
-  logActivity("Cleared the activity log");
-});
-renderLog();
+
 
 
 // Live Gmail checking while typing (all Gmail fields)
-["regEmail", "uEmail", "empEmail"].forEach(function (id) {
+["empEmail"].forEach(function (id) {
   const el = document.getElementById(id);
+  if (!el) return;
   const formId = el.form.id;
   el.addEventListener("input", function () {
     if (el.value.indexOf("@") !== -1 || el.value.length >= 6) validateField(formId, id);
@@ -1440,7 +1662,6 @@ document.addEventListener("click", function (e) {
   const g = e.target.closest("[data-go]");
   if (!g) return;
   const sec = g.dataset.go;
-  if (sec === "usermgmt" && !can("admin")) return;
   go(sec);
   closeDropdowns();
 });
@@ -1466,7 +1687,7 @@ $("#btnAbout").addEventListener("click", function () {
 // Export all data as a JSON backup file
 $("#btnExport").addEventListener("click", function () {
   closeDropdowns();
-  if (!can("admin")) return alert("Only administrators can export a data backup.");
+  if (!can("admin")) return alertDialog("Not allowed", "Only administrators can export a data backup.", "warn");
   const data = {
     exportedAt: new Date().toISOString(),
     employees: employees, attendance: attendance, cashAdvances: cashAdvances,
@@ -1486,18 +1707,6 @@ function buildNotifications() {
   const list = [];
   const today = todayISO();
   const isWorkday = new Date().getDay() !== 0;
-
-  if (can("admin")) {
-    const pending = users.filter(function (u) { return u.status === "Pending"; });
-    if (pending.length) list.push({ key: "pending-" + pending.map(function (u) { return u.id; }).join(","), type: "warn", go: "usermgmt",
-      text: pending.length + " account" + (pending.length > 1 ? "s" : "") + " waiting for approval: " + pending.map(function (u) { return u.username; }).join(", ") });
-
-    const soon = users.filter(function (u) {
-      if (!u.expiry || isExpired(u)) return false;
-      return (new Date(u.expiry) - new Date(today)) / 86400000 <= 7;
-    });
-    soon.forEach(function (u) { list.push({ key: "exp-" + u.id + u.expiry, type: "warn", go: "usermgmt", text: "Access for " + u.username + " expires on " + fmtDate(u.expiry) }); });
-  }
 
   const todays = attendance.filter(function (a) { return a.date === today; });
   const lates = todays.filter(function (a) { return a.lateMin > 0; });
@@ -1575,12 +1784,12 @@ $("#infoModal").addEventListener("click", function (e) { if (e.target === this) 
 $("#btnHelp").addEventListener("click", function () {
   openInfo("User Guide",
     '<ol class="guide">' +
-    '<li><strong>Employees:</strong> add a worker with the form. Use the <b>&hellip;</b> menu on a card to edit, record attendance, add a cash advance, or remove.</li>' +
+    '<li><strong>Employees:</strong> use the <b>+ Add Employee</b> button to register a worker in a floating form. The <b>&hellip;</b> menu on a card edits, records attendance, adds a cash advance, or removes.</li>' +
     '<li><strong>Attendance:</strong> select an employee and press <b>Time In</b> / <b>Time Out</b>. Arriving after 8:00 AM is marked late automatically.</li>' +
     '<li><strong>Cash Advance:</strong> record the amount and date; it is deducted in the payroll for that period.</li>' +
     '<li><strong>Payroll:</strong> pick the period and press <b>Generate Payroll</b>. Use <b>Print Report</b> for a paper copy.</li>' +
     '<li><strong>Reports:</strong> attendance and deduction summary for any date range.</li>' +
-    '<li><strong>User Management</strong> (admin): add users, approve registrations, set access rights, and view the activity log.</li>' +
+    '<li><strong>Account:</strong> use the avatar menu (top right) to change your password or sign out.</li>' +
     '<li><strong>Top bar:</strong> search employees, <b>+</b> quick add, bell for notifications, avatar for password change and sign out.</li>' +
     '</ol>' +
     '<p class="note"><strong>Need more help?</strong> Contact the system administrator at <b>joeconsteelworks@gmail.com</b>.</p>');
@@ -1589,22 +1798,6 @@ $("#btnHelp").addEventListener("click", function () {
 // Refresh notifications whenever someone signs in
 $("#loginForm").addEventListener("submit", function () { setTimeout(renderNotifications, 0); });
 
-
-/* ================================================================
-   LOGIN MFA (demo one-time code)
-   A new 6-digit code is generated each time the login screen loads.
-   In a real system it would be sent by SMS or email; here it is
-   shown under the field so the validation can be demonstrated.
-   ================================================================ */
-var currentMfa = "";
-function newMfaCode() {
-  currentMfa = String(Math.floor(100000 + Math.random() * 900000));
-  $("#mfaCode").textContent = currentMfa;
-  $("#loginMfa").value = "";
-}
-newMfaCode();
-$("#mfaNew").addEventListener("click", function (e) { e.preventDefault(); newMfaCode(); $("#loginMfa").focus(); });
-$("#loginMfa").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 6); });
 
 // Older saved accounts: the default admin gets a full name
 users.forEach(function (u) { if (u.id === "USR-001" && !u.fullName) u.fullName = "System Administrator"; });
@@ -1639,11 +1832,20 @@ saveUsers();
 
 
 /* ================================================================
-   EMPLOYEE REGISTRATION DEFAULTS
+   EMPLOYEE FORM DEFAULTS + POSITION -> DAILY RATE SUGGESTION
    ================================================================ */
 var DEFAULT_RATES = { "Welder": 650, "Fabricator": 600, "Laborer": 500, "Foreman": 750, "Helper": 480, "HR Staff": 560, "Timekeeper / Staff": 550 };
-$("#regHired").value = todayISO();
-$("#regHired").max = todayISO();
+$("#empHired").value = todayISO();
+$("#empHired").max = todayISO();
+$("#empBday").max = todayISO();
+
+// Choosing a position suggests its standard daily rate (a custom rate is never overwritten)
+$("#empPosition").addEventListener("change", function () {
+  const rate = $("#empRate");
+  const prev = rate.dataset.auto || "";
+  const next = DEFAULT_RATES[this.value] || "";
+  if (next && (!rate.value || rate.value === prev)) { rate.value = next; rate.dataset.auto = next; }
+});
 
 /* ================================================================
    EMPLOYEE MODE
@@ -1709,7 +1911,8 @@ function renderPortal() {
   $("#pAvatar").textContent = initials(emp.fullName);
   $("#pAvatar").style.background = avatarColor(emp.fullName);
   $("#pName").textContent = emp.fullName + " (" + emp.id + ")";
-  $("#pSub").textContent = emp.position + " · " + emp.department + " · Hired " + fmtDate(emp.dateHired) + " · Daily rate " + money(emp.dailyRate);
+  $("#pSub").textContent = emp.position + " · Hired " + fmtDate(emp.dateHired) + " · Daily rate " + money(emp.dailyRate)
+    + (emp.address && emp.address.city ? " · " + (emp.address.barangay ? emp.address.barangay + ", " : "") + emp.address.city : "");
 
   const pay = computePayrollRows(from, to).find(function (r) { return r.emp.id === emp.id; });
   $("#pDays").textContent = pay.daysPresent;
@@ -1867,3 +2070,13 @@ setInterval(renderMsgBadge, 4000);
 
 // Re-apply now (the session may already have been restored earlier in this file)
 if (currentUser) { applyPermissions(); if (!isStaff()) renderPortal(); }
+/* ---------- console/debug helpers (window.EMS.x in DevTools) ---------- */
+window.EMS = {
+  alertDialog: alertDialog, confirmDialog: confirmDialog, floatDialog: floatDialog,
+  openEmpModal: openEmpModal, startEmpEdit: startEmpEdit, closeEmpModal: closeEmpModal,
+  go: go, saveAll: saveAll, renderNotifications: renderNotifications, state: function () {
+    return { employees: employees, attendance: attendance, cashAdvances: cashAdvances,
+             users: users, log: store.get("jems2_log", []) };
+  }
+};
+})();

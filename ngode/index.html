@@ -36,96 +36,18 @@
           <button type="button" class="pw-toggle" id="pwToggle">Show</button>
         </div>
       </label>
-      <label class="field">Verification Code (MFA)
-        <input type="text" id="loginMfa" placeholder="6-digit code" required minlength="6" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code">
-        <small class="field-hint">Your one-time code: <b id="mfaCode">------</b> <a href="#" id="mfaNew" class="mfa-new">New code</a></small>
-      </label>
-      <label class="remember">
+            <label class="remember">
         <input type="checkbox" id="rememberMe"> Remember me
       </label>
       <div class="login-error" id="loginError"></div>
       <button type="submit" class="btn btn-login">Sign In</button>
     </form>
 
-    <p class="auth-switch">New employee? <a href="#" id="showRegister">Register here</a></p>
-    <div class="login-hint">Demo account &mdash; username: <b>admin</b> &middot; password: <b>admin123</b></div>
+        <p class="auth-switch">New employee? <a href="#" id="showRegister">Register here</a></p>
+      <div class="login-hint">Admin &mdash; <b>admin</b> / <b>admin123</b><br><b>Employees:</b> sign in with the username &amp; password your admin gave you to open your My Portal.</div>
   </div>
 
-  <!-- ============ REGISTRATION ============ -->
-  <div class="login-card" id="registerCard" hidden>
-    <div class="login-brand">
-      <div class="brand-logo">
-        <img src="../images/20240211_142203_0000.png" alt="Joecon's"
-             onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
-        <span class="brand-fallback">J</span>
-      </div>
-      <div><h1>Joecon's EMS</h1><small>Steel Works</small></div>
-    </div>
-    <h2>Employee Registration</h2>
-    <p class="login-sub">Fill in your details to be added as a new employee of Joecon's Steel Works.</p>
-
-    <form id="registerForm" novalidate>
-      <label class="field">Full Name
-        <input type="text" id="regName" placeholder="e.g. Juan Dela Cruz" required minlength="3" maxlength="60" pattern="[A-Za-zÑñ .'-]+">
-      </label>
-      <div class="reg-row">
-        <label class="field">Username
-          <input type="text" id="regUsername" placeholder="e.g. j.delacruz" required minlength="4" maxlength="20" pattern="[a-z0-9._]+" autocomplete="username">
-        </label>
-        <label class="field">Department
-          <select id="regDepartment" required>
-            <option value="" selected disabled>— Select —</option>
-            <option>Admin / HR</option>
-            <option>Fabrication</option>
-            <option>Welding</option>
-            <option>Construction</option>
-          </select>
-        </label>
-      </div>
-      <div class="reg-row">
-        <label class="field">Position / Job Title
-          <select id="regPosition" required>
-            <option value="" selected disabled>— Select —</option>
-            <option>Welder</option>
-            <option>Fabricator</option>
-            <option>Laborer</option>
-            <option>Foreman</option>
-            <option>Helper</option>
-            <option>HR Staff</option>
-            <option>Timekeeper / Staff</option>
-          </select>
-        </label>
-        <label class="field">Date Hired
-          <input type="date" id="regHired" required min="1990-01-01">
-        </label>
-      </div>
-      <div class="reg-row">
-        <label class="field">Email Address
-          <input type="email" id="regEmail" placeholder="e.g. juandelacruz@gmail.com" required minlength="16" maxlength="40" pattern="(?!.*\.\.)(?![0-9.]+@)[a-z0-9][a-z0-9.]{4,28}[a-z0-9]@gmail\.com" title="Gmail only: lowercase letters, numbers and periods, ending in @gmail.com (e.g. juandelacruz@gmail.com)" spellcheck="false" autocapitalize="off" autocomplete="email">
-          <small class="field-hint">Only <b>@gmail.com</b> is accepted &middot; lowercase letters, numbers and periods</small>
-        </label>
-        <label class="field">Contact Number
-          <input type="tel" id="regPhone" placeholder="09171234567" required minlength="11" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric">
-        </label>
-      </div>
-      <label class="field">Password
-        <div class="pw-wrap">
-          <input type="password" id="regPassword" placeholder="Min. 8 chars, letters &amp; numbers" required minlength="8" maxlength="32" autocomplete="new-password">
-          <button type="button" class="pw-toggle" data-toggle="regPassword">Show</button>
-        </div>
-      </label>
-      <div class="pw-meter"><span id="pwMeterBar"></span></div>
-      <label class="field">Confirm Password
-        <input type="password" id="regConfirm" placeholder="Re-enter password" required minlength="8" maxlength="32" autocomplete="new-password">
-      </label>
-      <label class="remember">
-        <input type="checkbox" id="regTerms" required> I confirm the information above is true and correct
-      </label>
-      <button type="submit" class="btn btn-login">Register</button>
-    </form>
-    <p class="auth-switch">Already have an account? <a href="#" id="showLogin">Sign in</a></p>
   </div>
-</div>
 
 <div class="app">
 
@@ -156,20 +78,16 @@
       <a class="nav-link" data-section="attendance">
         <img class="nav-ic" src="../images/calendar-clock.png" alt=""> Attendance</a>
       <a class="nav-link" data-section="cashadvance">
-        <img class="nav-ic" src="../images/philippine-peso.png" alt=""> Cash Advance</a>
+        <img class="nav-ic" src="../images/philippine-peso (1).png" alt=""> Cash Advance</a>
 
       <p class="nav-group" data-staff-only>Organization</p>
       <a class="nav-link" data-section="employees">
         <img class="nav-ic" src="../images/id-card-lanyard.png" alt=""> Employees</a>
       <a class="nav-link" data-section="payroll">
-        <img class="nav-ic" src="../images/hand-coins.png" alt=""> Payroll</a>
+        <img class="nav-ic" src="../images/hand-coins (1).png" alt=""> Payroll</a>
       <a class="nav-link" data-section="reports">
         <img class="nav-ic" src="../images/message-circle-warning.png" alt=""> Reports</a>
-      <p class="nav-group" data-admin-only>Administration</p>
-      <a class="nav-link" data-section="usermgmt" data-admin-only>
-        <svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.810 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
-        User Management
-      </a>
+      
     </nav>
 
     <button type="button" class="sidebar-help" id="btnHelp">
@@ -377,49 +295,11 @@
         <div class="page-head">
           <div class="page-head-row">
             <h2 id="empCountTitle">Employees</h2>
-            <button class="btn btn-sm btn-outline" data-focus-add>+ New Hire</button>
           </div>
           <p class="page-sub">Employee records and information</p>
         </div>
 
-        <div class="card">
-          <h3 id="empFormTitle">Add New Employee</h3>
-          <form id="employeeForm" novalidate>
-            <div class="form-grid">
-              <label class="field">Full Name
-                <input type="text" id="empName" placeholder="e.g. Juan Dela Cruz" required minlength="3" maxlength="60" pattern="[A-Za-zÑñ .'-]+">
-              </label>
-              <label class="field">Position / Job Title
-                <input type="text" id="empPosition" placeholder="e.g. Welder" required minlength="2" maxlength="40">
-              </label>
-              <label class="field">Department
-                <select id="empDepartment" required>
-                  <option value="" selected disabled>— Select department —</option>
-                  <option>Fabrication</option>
-                  <option>Welding</option>
-                  <option>Construction</option>
-                  <option>Admin / HR</option>
-                </select>
-              </label>
-              <label class="field">Daily Rate (₱)
-                <input type="number" id="empRate" placeholder="e.g. 650" min="300" max="5000" step="0.01" required>
-              </label>
-              <label class="field">Date Hired
-                <input type="date" id="empHired" required min="1990-01-01">
-              </label>
-              <label class="field">Email Address (Gmail)
-                <input type="email" id="empEmail" placeholder="e.g. juandelacruz@gmail.com" required minlength="16" maxlength="40" pattern="(?!.*\.\.)(?![0-9.]+@)[a-z0-9][a-z0-9.]{4,28}[a-z0-9]@gmail\.com" title="Gmail only: lowercase letters, numbers and periods, ending in @gmail.com (e.g. juandelacruz@gmail.com)" spellcheck="false" autocapitalize="off">
-              </label>
-              <label class="field">Contact Number
-                <input type="tel" id="empPhone" placeholder="e.g. 09171234567" required minlength="11" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric">
-              </label>
-              <div class="field-spacer btn-row">
-                <button type="submit" class="btn" id="empSubmit" data-need="write">Add Employee</button>
-                <button type="button" class="btn btn-outline" id="empCancel" hidden>Cancel</button>
-              </div>
-            </div>
-          </form>
-        </div>
+        
 
         <div class="card">
           <div class="card-head-row">
@@ -427,12 +307,13 @@
             <div class="filter-bar">
               <label class="filter-select">
                 <span>Filter:</span>
-                <select id="deptFilter">
-                  <option value="">All Departments</option>
-                  <option>Fabrication</option>
-                  <option>Welding</option>
-                  <option>Construction</option>
-                  <option>Admin / HR</option>
+                <select id="posFilter">
+                  <option value="">All Positions</option>
+                  <option>Welder</option>
+                  <option>Fabricator</option>
+                  <option>Laborer</option>
+                  <option>Foreman</option>
+                  <option>Helper</option>
                 </select>
               </label>
             </div>
@@ -587,118 +468,7 @@
         </div>
       </section>
 
-      <!-- ===== USER MANAGEMENT (Admin only) ===== -->
-      <section class="section" id="section-usermgmt">
-        <div class="page-head">
-          <h2>User Management</h2>
-          <p class="page-sub">Add system users and assign roles &amp; access rights</p>
-        </div>
-
-        <div class="grid-2">
-          <!-- Form 1: Add User -->
-          <div class="card">
-            <h3 id="userFormTitle">Form 1 &mdash; Add User</h3>
-            <form id="userForm" novalidate>
-              <div class="form-grid single">
-                <label class="field">Full Name
-                  <input type="text" id="uFullName" placeholder="e.g. Juan Dela Cruz" required minlength="3" maxlength="60" pattern="[A-Za-zÑñ .'-]+">
-                </label>
-                <label class="field">Username
-                  <input type="text" id="uUsername" placeholder="e.g. j.delacruz" required minlength="4" maxlength="20" pattern="[a-z0-9._]+">
-                </label>
-                <label class="field">Email Address
-                  <input type="email" id="uEmail" placeholder="e.g. juandelacruz@gmail.com" required minlength="16" maxlength="40" pattern="(?!.*\.\.)(?![0-9.]+@)[a-z0-9][a-z0-9.]{4,28}[a-z0-9]@gmail\.com" title="Gmail only: lowercase letters, numbers and periods, ending in @gmail.com (e.g. juandelacruz@gmail.com)" spellcheck="false" autocapitalize="off">
-                </label>
-                <label class="field">Department
-                  <select id="uDepartment" required>
-                    <option value="" selected disabled>— Select department —</option>
-                    <option>Admin / HR</option>
-                    <option>Fabrication</option>
-                    <option>Welding</option>
-                    <option>Construction</option>
-                  </select>
-                </label>
-                <label class="field">Contact Number
-                  <input type="tel" id="uPhone" placeholder="e.g. 09171234567" required minlength="11" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric">
-                </label>
-                <label class="field"><span id="uPasswordLabel">Initial Password</span>
-                  <div class="pw-wrap">
-                    <input type="password" id="uPassword" placeholder="Min. 8 chars, letters &amp; numbers" required minlength="8" maxlength="32" pattern="(?=.*[A-Za-z])(?=.*\d).{8,32}">
-                    <button type="button" class="pw-toggle" data-toggle="uPassword">Show</button>
-                  </div>
-                </label>
-                <label class="field">Status
-                  <select id="uStatus" required>
-                    <option value="Active">Active</option>
-                    <option value="Pending">Pending Approval</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </label>
-                <div class="field-spacer btn-row">
-                  <button type="submit" class="btn" id="userSubmit">Add User</button>
-                  <button type="button" class="btn btn-outline" id="userCancel" hidden>Cancel</button>
-                </div>
-              </div>
-            </form>
-            <p class="form-msg" id="userFormMsg"></p>
-          </div>
-
-          <!-- Form 2: Role & Access Assignment -->
-          <div class="card">
-            <h3>Form 2 &mdash; Role &amp; Access Assignment</h3>
-            <form id="roleForm" novalidate>
-              <div class="form-grid single">
-                <label class="field">User ID
-                  <select id="rUserId" required></select>
-                </label>
-                <div class="field">
-                  Access Rights
-                  <div class="checkbox-row">
-                    <label class="chk"><input type="checkbox" class="acc-chk" value="read" checked> Read</label>
-                    <label class="chk"><input type="checkbox" class="acc-chk" value="write"> Write</label>
-                    <label class="chk"><input type="checkbox" class="acc-chk" value="execute"> Execute</label>
-                    <label class="chk"><input type="checkbox" class="acc-chk" value="admin"> Admin</label>
-                  </div>
-                </div>
-                <label class="field">Expiration Date
-                  <input type="date" id="rExpiry">
-                </label>
-                <div class="field-spacer">
-                  <button type="submit" class="btn">Assign Access Rights</button>
-                </div>
-              </div>
-            </form>
-            <p class="form-msg" id="roleFormMsg"></p>
-            <p class="note"><strong>Access Rights:</strong> Read = view records &nbsp;|&nbsp; Write = add/edit data &nbsp;|&nbsp; Execute = time-in/out &amp; payroll &nbsp;|&nbsp; Admin = full access &amp; user management.</p>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>User Accounts <span class="pending-count" id="pendingCount" hidden></span></h3>
-          <table>
-            <thead>
-              <tr>
-                <th>User ID</th><th>Full Name</th><th>Username</th><th>Email</th><th>Department</th>
-                <th>Access Rights</th><th>Expires</th><th>Status</th><th class="text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody id="userTable"></tbody>
-          </table>
-        </div>
-
-        <div class="card">
-          <div class="card-head-row">
-            <h3 style="border:none;margin:0;padding:0;">Activity Log</h3>
-            <button class="btn btn-outline btn-sm" id="btnClearLog">Clear Log</button>
-          </div>
-          <table>
-            <thead><tr><th>Date &amp; Time</th><th>User</th><th>Activity</th></tr></thead>
-            <tbody id="logTable"></tbody>
-          </table>
-        </div>
-      </section>
-
-    </main>
+      </main>
   </div>
 </div>
 
@@ -761,6 +531,248 @@
   </div>
 </div>
 
+<!-- ============ EMPLOYEE REGISTRATION WINDOW (opened from the login screen) ============ -->
+<div class="float-backdrop" id="regModal" hidden>
+  <div class="float-box wide" role="dialog" aria-modal="true" aria-labelledby="regTitle">
+    <div class="modal-head">
+      <h3 id="regTitle">Employee Registration</h3>
+      <button type="button" class="modal-x" id="regModalX" title="Close window">&times;</button>
+    </div>
+    <form id="registerForm" novalidate>
+      <div class="reg-grid">
+        <label class="field">First name
+          <input type="text" id="regFirst" placeholder="Juan" required minlength="2" maxlength="30" pattern="[A-Za-z\u00d1\u00f1 .'-]+" autocomplete="given-name">
+        </label>
+        <label class="field">Last name
+          <input type="text" id="regLast" placeholder="Dela Cruz" required minlength="2" maxlength="30" pattern="[A-Za-z\u00d1\u00f1 .'-]+" autocomplete="family-name">
+        </label>
+
+        <label class="field"><span class="lab-row">Middle name <small class="opt-tag">Optional</small></span>
+          <input type="text" id="regMiddle" placeholder="Santos" maxlength="30" pattern="[A-Za-z\u00d1\u00f1 .'-]+" autocomplete="additional-name">
+        </label>
+        <label class="field">Gender
+          <select id="regGender" required>
+            <option value="" selected disabled>Select gender</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Prefer not to say</option>
+          </select>
+        </label>
+
+        <label class="field">Birthday
+          <input type="date" id="regBday" required min="1940-01-01">
+        </label>
+        <label class="field">Phone number
+          <div class="phone-group">
+            <span class="phone-prefix">+63</span>
+            <input type="tel" id="regPhone" placeholder="917 555 0182" required minlength="10" maxlength="10" inputmode="numeric" autocomplete="tel-national">
+          </div>
+        </label>
+
+        <label class="field">Country
+          <select id="regCountry" required>
+            <option value="" selected disabled>Select country</option>
+            <option>Philippines</option>
+          </select>
+        </label>
+        <label class="field">Region / State
+          <select id="regRegion" required disabled>
+            <option value="" selected disabled>Select a country first</option>
+          </select>
+        </label>
+
+        <label class="field">City / Municipality
+          <select id="regCity" required disabled>
+            <option value="" selected disabled>Select a region first</option>
+          </select>
+        </label>
+        <label class="field">Barangay
+          <input type="text" id="regBarangay" placeholder="Select a city first" maxlength="60" required disabled>
+        </label>
+
+        <label class="field">Street / House no.
+          <input type="text" id="regStreet" placeholder="Blk 4 Lot 12, Rizal St." maxlength="80" required>
+        </label>
+        <label class="field">Postal code
+          <input type="text" id="regPostal" placeholder="e.g. 9506" maxlength="4" inputmode="numeric" required>
+        </label>
+
+        <label class="field span-2">Position
+          <select id="regPosition" required>
+            <option value="" selected disabled>Select position</option>
+            <option>Welder</option>
+            <option>Fabricator</option>
+            <option>Laborer</option>
+            <option>Foreman</option>
+            <option>Helper</option>
+          </select>
+          <small class="field-hint">Your daily rate is set automatically from this position &mdash; the admin can adjust it later.</small>
+        </label>
+
+        <label class="field span-2">Email address (Gmail)
+          <input type="email" id="regEmail" placeholder="e.g. juandelacruz@gmail.com" required minlength="16" maxlength="40" pattern="(?!.*\.\.)(?![0-9.]+@)[a-z0-9][a-z0-9.]{4,28}[a-z0-9]@gmail\.com" title="Gmail only: lowercase letters, numbers and periods, ending in @gmail.com (e.g. juandelacruz@gmail.com)" spellcheck="false" autocapitalize="off" autocomplete="email">
+          <small class="field-hint">Only <b>@gmail.com</b> is accepted &middot; lowercase letters, numbers and periods</small>
+        </label>
+
+        <div class="field span-2 portal-sep">
+          <span class="lab-row">Your portal login <small class="opt-tag">Auto-created on registration</small></span>
+          <small class="field-hint">These credentials open your own <b>My Portal</b> &mdash; your attendance, payroll summary and cash advances only. Keep them private.</small>
+        </div>
+        <label class="field">Username
+          <input type="text" id="regUsername" placeholder="e.g. j.delacruz" required minlength="4" maxlength="20" pattern="[a-z0-9._]+" spellcheck="false" autocapitalize="off" autocomplete="username">
+        </label>
+        <label class="field">Password
+          <div class="pw-wrap">
+            <input type="password" id="regPassword" placeholder="Min. 8 chars, letters &amp; numbers" required minlength="8" maxlength="32" autocomplete="new-password">
+            <button type="button" class="pw-toggle" data-toggle="regPassword">Show</button>
+          </div>
+          <div class="pw-meter"><span id="regPwBar"></span></div>
+        </label>
+        <label class="field">Confirm password
+          <input type="password" id="regConfirm" placeholder="Re-enter password" required minlength="8" maxlength="32" autocomplete="new-password">
+        </label>
+
+        <label class="remember span-2">
+          <input type="checkbox" id="regTerms" required> I confirm the information above is true and correct
+        </label>
+      </div>
+      <div class="btn-row modal-actions">
+        <button type="button" class="btn btn-outline" id="regCancel">Cancel</button>
+        <button type="submit" class="btn" id="regSubmit">Register</button>
+      </div>
+    </form>
+    <p class="auth-switch" style="margin-top:14px;">Already have an account? <a href="#" id="regToLogin">Sign in</a></p>
+  </div>
+</div>
+
+<!-- ============ EMPLOYEE FORM WINDOW (Add / Edit) ============ -->
+<div class="float-backdrop" id="empModal" hidden>
+  <div class="float-box wide" role="dialog" aria-modal="true" aria-labelledby="empFormTitle">
+    <div class="modal-head">
+      <h3 id="empFormTitle">Add New Employee</h3>
+      <button type="button" class="modal-x" id="empModalX" title="Close window">&times;</button>
+    </div>
+    <form id="employeeForm" novalidate>
+            <div class="reg-grid">
+              <label class="field">First name
+                <input type="text" id="empFirst" placeholder="Juan" required minlength="2" maxlength="30" pattern="[A-Za-zÑñ .'-]+" autocomplete="given-name">
+              </label>
+              <label class="field">Last name
+                <input type="text" id="empLast" placeholder="Dela Cruz" required minlength="2" maxlength="30" pattern="[A-Za-zÑñ .'-]+" autocomplete="family-name">
+              </label>
+
+              <label class="field"><span class="lab-row">Middle name <small class="opt-tag">Optional</small></span>
+                <input type="text" id="empMiddle" placeholder="Santos" maxlength="30" pattern="[A-Za-zÑñ .'-]+" autocomplete="additional-name">
+              </label>
+              <label class="field">Gender
+                <select id="empGender" required>
+                  <option value="" selected disabled>Select gender</option>
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Prefer not to say</option>
+                </select>
+              </label>
+
+              <label class="field">Birthday
+                <input type="date" id="empBday" required min="1940-01-01">
+              </label>
+              <label class="field">Phone number
+                <div class="phone-group">
+                  <span class="phone-prefix">+63</span>
+                  <input type="tel" id="empPhone" placeholder="917 555 0182" required minlength="10" maxlength="10" inputmode="numeric" autocomplete="tel-national">
+                </div>
+              </label>
+
+              <label class="field">Country
+                <select id="empCountry" required>
+                  <option value="" selected disabled>Select country</option>
+                  <option>Philippines</option>
+                </select>
+              </label>
+              <label class="field">Region / State
+                <select id="empRegion" required disabled>
+                  <option value="" selected disabled>Select a country first</option>
+                </select>
+              </label>
+
+              <label class="field">City / Municipality
+                <select id="empCity" required disabled>
+                  <option value="" selected disabled>Select a region first</option>
+                </select>
+              </label>
+              <label class="field">Barangay
+                <input type="text" id="empBarangay" placeholder="Select a city first" maxlength="60" required disabled>
+              </label>
+
+              <label class="field">Street / House no.
+                <input type="text" id="empStreet" placeholder="Blk 4 Lot 12, Commonwealth Ave." maxlength="80" required>
+              </label>
+              <label class="field">Postal code
+                <input type="text" id="empPostal" placeholder="e.g. 9506" maxlength="4" inputmode="numeric" required>
+              </label>
+
+              <label class="field">Position
+                <select id="empPosition" required>
+                  <option value="" selected disabled>Select position</option>
+                  <option>Welder</option>
+                  <option>Fabricator</option>
+                  <option>Laborer</option>
+                  <option>Foreman</option>
+                  <option>Helper</option>
+                </select>
+              </label>
+              <label class="field">Daily Rate (₱)
+                <input type="number" id="empRate" placeholder="e.g. 650" min="300" max="5000" step="0.01" required>
+              </label>
+
+              <label class="field">Date Hired
+                <input type="date" id="empHired" required min="1990-01-01">
+              </label>
+              <label class="field">Email address (Gmail)
+                <input type="email" id="empEmail" placeholder="e.g. juandelacruz@gmail.com" required minlength="16" maxlength="40" pattern="(?!.*\.\.)(?![0-9.]+@)[a-z0-9][a-z0-9.]{4,28}[a-z0-9]@gmail\.com" title="Gmail only: lowercase letters, numbers and periods, ending in @gmail.com (e.g. juandelacruz@gmail.com)" spellcheck="false" autocapitalize="off">
+                <small class="field-hint">Only <b>@gmail.com</b> is accepted &middot; lowercase letters, numbers and periods</small>
+              </label>
+
+              <div class="field span-2 portal-sep">
+                <span class="lab-row">My Portal login for this employee <small class="opt-tag">Optional &mdash; filled in by the admin</small></span>
+                <small class="field-hint">Create a username and password so this employee can sign in and see <b>only their own My Portal</b> (attendance, payroll and cash advances). Leave both blank for no login.</small>
+              </div>
+              <label class="field">Username
+                <input type="text" id="empUsername" placeholder="e.g. b.magbanua" minlength="4" maxlength="20" pattern="[a-z0-9._]+" spellcheck="false" autocapitalize="off" autocomplete="off">
+              </label>
+              <label class="field"><span id="empPwLabel">Password</span>
+                <div class="pw-wrap">
+                  <input type="password" id="empPortalPassword" placeholder="Min. 8 chars, letters &amp; numbers" minlength="8" maxlength="32" autocomplete="new-password">
+                  <button type="button" class="pw-toggle" data-toggle="empPortalPassword">Show</button>
+                </div>
+                <small class="field-hint" id="empPwHint">Letters and numbers, at least 8 characters.</small>
+              </label>
+
+            </div>
+            <div class="btn-row modal-actions">
+                <button type="button" class="btn btn-outline" id="empCancel">Cancel</button>
+                <button type="submit" class="btn" id="empSubmit" data-need="write">Add Employee</button>
+              </div>
+            </form>
+  </div>
+</div>
+
+<!-- ============ FLOATING DIALOG (replaces native alert/confirm) ============ -->
+<div class="float-backdrop" id="floatBackdrop" hidden>
+  <div class="float-box" role="alertdialog" aria-modal="true" aria-labelledby="floatTitle" aria-describedby="floatMsg">
+    <div class="float-head">
+      <span class="confirm-ic info" id="floatIcon"></span>
+      <h3 id="floatTitle">Notice</h3>
+    </div>
+    <p id="floatMsg"></p>
+    <div class="float-actions">
+      <button type="button" class="btn btn-outline" id="floatCancel">Cancel</button>
+      <button type="button" class="btn" id="floatOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="api.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

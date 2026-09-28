@@ -1599,3 +1599,130 @@ button.sidebar-help:hover { transform: translateY(-2px); }
 .field textarea.is-valid { border-color: #16a34a !important; }
 #msgBtn { position: relative; }
 @media (max-width: 640px) { .msg-layout { flex-direction: column; } .msg-list { width: 100%; border-right: none; max-height: 140px; } }
+/* ============ COMPOSITE REGISTRATION FORM (two-column, image-1 style) ============ */
+#registerCard { max-width: 640px; }
+.reg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; align-items: start; }
+.reg-grid .span-2 { grid-column: 1 / -1; }
+.reg-grid .field { margin-bottom: 0; }
+.reg-grid .remember { margin: 2px 0 0; }
+.reg-grid .btn-login { width: 100%; margin-top: 4px; }
+.reg-grid .pw-meter { margin: 2px 0 0; }
+@media (max-width: 620px) {
+  .reg-grid { grid-template-columns: 1fr; }
+  .reg-grid .span-2 { grid-column: auto; }
+}
+.lab-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.opt-tag { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.phone-group { display: flex; }
+.phone-prefix {
+  display: flex; align-items: center; padding: 0 12px;
+  background: #f1f4f8; border: 1px solid var(--border); border-right: 0;
+  border-radius: 9px 0 0 9px; font-size: 13px; font-weight: 700; color: #33415e;
+}
+.phone-group input { border-radius: 0 9px 9px 0 !important; }
+.phone-group input.is-invalid { border-radius: 0 9px 9px 0 !important; }
+.reg-grid select:disabled, .reg-grid input:disabled {
+  background: #f4f6fa; color: #9aa7bd; border-color: #e3e8f0; cursor: not-allowed;
+}
+.reg-grid select:disabled::placeholder, .reg-grid input:disabled::placeholder { color: #9aa7bd; }
+
+/* ============ FLOATING DIALOG WINDOW (replaces native alert / confirm) ============ */
+.float-backdrop {
+  position: fixed; inset: 0; z-index: 200; padding: 20px;
+  background: rgba(15, 23, 42, .45); backdrop-filter: blur(2px);
+  display: grid; place-items: center;
+  opacity: 0; transition: opacity .18s ease;
+}
+.float-backdrop[hidden] { display: none; }
+.float-backdrop.open { opacity: 1; }
+.float-box {
+  width: min(430px, 100%); background: #fff; border-radius: 16px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 24px 60px rgba(2, 6, 23, .35), 0 0 0 1px rgba(15, 23, 42, .06);
+  transform: translateY(12px) scale(.96); transition: transform .18s ease;
+}
+.float-backdrop.open .float-box { transform: none; }
+.float-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.float-head h3 { font-size: 16.5px; font-weight: 800; color: #1f2d3d; margin: 0; border: none; padding: 0; }
+.confirm-ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 auto; }
+.confirm-ic svg { width: 20px; height: 20px; }
+.confirm-ic.warn { background: #fef2f2; color: #dc2626; }
+.confirm-ic.info { background: #eff6ff; color: #2563eb; }
+.confirm-ic.ok   { background: #f0fdf4; color: #16a34a; }
+#floatMsg { margin: 0 0 18px; color: #46536b; font-size: 13.5px; line-height: 1.55; }
+.float-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.float-actions .btn { min-width: 92px; margin: 0; }
+
+/* ============ FORM WINDOWS (Add / Edit employee & user) ============ */
+#empModal, #userModal { z-index: 180; }          /* confirm dialogs (200) always sit on top */
+.float-box.wide { width: min(820px, 100%); max-height: min(92vh, 900px); overflow-y: auto; }
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: -2px 0 16px; padding-bottom: 12px; border-bottom: 1px solid #eef1f6;
+}
+.modal-head h3 { margin: 0; padding: 0; border: none; font-size: 17px; font-weight: 800; color: #1f2d3d; }
+.modal-x {
+  border: none; background: #f1f4f9; color: #5b6b80; width: 30px; height: 30px;
+  border-radius: 9px; font-size: 16px; line-height: 1; cursor: pointer; flex: 0 0 auto;
+  transition: background .15s ease, color .15s ease;
+}
+.modal-x:hover { background: #e5eaf2; color: #1f2d3d; }
+.float-box .reg-grid .field { margin-bottom: 0; }
+.float-box .btn-row.modal-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  margin-top: 20px; padding-top: 15px; border-top: 1px solid #eef1f6;
+}
+.float-box .btn-row.modal-actions .btn { min-width: 120px; margin: 0; }
+.um-grid { display: block; }
+.role-card .form-grid.single { max-width: 560px; }
+body.modal-open { overflow: hidden; }
+
+/* ============ SUCCESS TOAST ============ */
+#toastBox {
+  position: fixed; left: 50%; bottom: 26px; z-index: 400;
+  transform: translate(-50%, 16px);
+  background: #101c2c; color: #fff; padding: 11px 18px 11px 16px; border-radius: 999px;
+  font-size: 13.5px; font-weight: 600; letter-spacing: .1px;
+  box-shadow: 0 14px 34px rgba(2, 6, 23, .38);
+  display: flex; align-items: center; gap: 9px;
+  max-width: min(92vw, 620px);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+#toastBox::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: #34d399; }
+#toastBox.err::before { background: #f87171; }
+#toastBox.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 620px) {
+  .float-box { padding: 18px 16px 16px; }
+  .float-box .btn-row.modal-actions { flex-direction: column-reverse; }
+  .float-box .btn-row.modal-actions .btn { width: 100%; }
+}
+
+/* keep the window's action buttons always visible while the form scrolls */
+.float-box .btn-row.modal-actions {
+  position: sticky; bottom: -22px;
+  background: #fff; margin-bottom: -18px;
+  padding-bottom: 16px; z-index: 2;
+}
+
+/* ============ DATABASE STATUS BANNER (MySQL bridge) ============ */
+#dbBanner {
+  position: fixed; left: 16px; bottom: 16px; z-index: 500;
+  padding: 9px 14px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
+  max-width: min(90vw, 520px);
+  opacity: 0; transform: translateY(8px); pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  box-shadow: 0 10px 26px rgba(2, 6, 23, .3);
+}
+#dbBanner.ok { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; opacity: 1; transform: none; }
+#dbBanner.err { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; opacity: 1; transform: none; }
+
+/* ============ PORTAL LOGIN SECTION IN THE EMPLOYEE WINDOW ============ */
+.float-box .portal-sep {
+  border-top: 1px solid #eef1f6;
+  padding-top: 14px;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+.float-box .portal-sep .field-hint { margin-top: 6px; }
